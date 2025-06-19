@@ -1,0 +1,298 @@
+\documentclass{article}
+
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage{caption}
+\usepackage{fullpage}
+\usepackage{siunitx}
+
+\renewcommand\thefigure{\arabic{figure}}
+\setcounter{figure}{6}
+
+% Define a command to include a graph with proper size and trimming
+\newcommand{\includeGraph}[2][width=.377\textwidth]{%
+  \includegraphics[#1]{graphs/#2}%
+}
+
+\begin{document}
+
+\section*{Overhead Evaluation Graphs}
+\subsection{Uniform Distribution}
+
+\begin{figure*}[htbp]
+    \centering
+    \medskip
+    \textit{Read heavy}\quad\quad
+    \includegraphics[height=.016\textwidth]{graphs/SkipList/legend_overhead.png}\quad\quad
+    \textit{Update heavy}\par
+    \medskip
+    Without a concurrent size thread\par
+    \smallskip
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+    \medskip
+    With a concurrent size thread and no delay\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+    \medskip
+    With a concurrent size thread and 700 \si{\micro\second} delay\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead_united_SkipList_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead_united_bar_SkipList_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+    \caption{Overhead on skip list operations}
+    \label{fig:SkipList overhead}
+\end{figure*}
+
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\quad\quad
+	\includegraphics[height=.016\textwidth]{graphs/BST/legend_overhead}\quad\quad
+	\textit{Update heavy}\par
+	\medskip
+	Without a concurrent size thread\par
+        \smallskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and no delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and 700 \si{\micro\second} delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead_united_BST_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead_united_bar_BST_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\caption{Overhead on BST operations}
+	\label{fig:BST overhead}
+\end{figure*}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\quad\quad
+	\includegraphics[height=.016\textwidth]{graphs/HashTable/legend_overhead}\quad\quad
+	\textit{Update heavy}\par
+	\medskip
+	Without a concurrent size thread\par
+        \smallskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and no delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and 700 \si{\micro\second} delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead_united_HashTable_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead_united_bar_HashTable_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\caption{Overhead on hash table operations}
+	\label{fig:HT overhead}
+\end{figure*}
+
+\newpage
+\subsection{Zipfian Distribution}
+Keys for contains operations are drawn using a Zipfian distribution with a skew factor of 0.99.
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\quad\quad
+	\includegraphics[height=.016\textwidth]{graphs/SkipList/legend_zipfian_overhead.png}\quad\quad
+	\textit{Update heavy}\par
+	\medskip
+	Without a concurrent size thread\par
+        \smallskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and no delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and 700 \si{\micro\second} delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-zipfian_united_SkipList_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/SkipList/overhead-zipfian_united_bar_SkipList_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\caption{Overhead on skip list operations with Zipfian-distributed}
+	\label{fig:SkipList zipfian overhead}
+\end{figure*}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\quad\quad
+	\includegraphics[height=.016\textwidth]{graphs/BST/legend_zipfian_overhead.png}\quad\quad
+	\textit{Update heavy}\par
+	\medskip
+	Without a concurrent size thread\par
+        \smallskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and no delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and 700 \si{\micro\second} delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-zipfian_united_BST_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/BST/overhead-zipfian_united_bar_BST_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\caption{Overhead on BST operations with Zipfian-distributed}
+	\label{fig:BST zipfian overhead}
+\end{figure*}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\quad\quad
+	\includegraphics[height=.016\textwidth]{graphs/HashTable/legend_zipfian_overhead.png}\quad\quad
+	\textit{Update heavy}\par
+	\medskip
+	Without a concurrent size thread\par
+        \smallskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_3ins-2rem_0sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_30ins-20rem_0sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and no delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_3ins-2rem_1sizeThreads_0delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_30ins-20rem_1sizeThreads_0delay.png}\par
+	\medskip
+	With a concurrent size thread and 700 \si{\micro\second} delay\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-zipfian_united_HashTable_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_3ins-2rem_1sizeThreads_700delay.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .2cm}]{graphs/HashTable/overhead-zipfian_united_bar_HashTable_1000000setSize_30ins-20rem_1sizeThreads_700delay.png}\par
+	\caption{Overhead on hash table operations with Zipfian-distributed}
+	\label{fig:HashTable zipfian overhead}
+\end{figure*}
+
+\newpage
+\section{Scalability Evaluation Graphs}
+\begin{figure*}[htbp]
+    \centering
+    \medskip
+    \textit{Read heavy}\quad\quad
+    \includegraphics[height=.0205\textwidth]{graphs/SkipList/legend_scalability.png}\quad\quad
+    \textit{Update heavy}\par
+    \medskip
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/scalability_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/scalability_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay.png}\vspace{-1.2em}
+    \caption{size scalability in skip list}
+    \label{fig:size scalability SL}
+    \medskip
+    \medskip
+    \medskip
+    \includegraphics[height=.021\textwidth]{graphs/BST/legend_scalability.png}\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/scalability_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/scalability_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay.png}\vspace{-1.2em}
+    \caption{size scalability in BST}
+    \label{fig:size scalability BST}
+    \medskip
+    \medskip
+    \medskip
+    \includegraphics[height=.021\textwidth]{graphs/HashTable/legend_scalability.png}\par
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/scalability_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay.png}\hspace{2.5em}
+    \includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/scalability_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay.png}\vspace{-1.2em}
+    \caption{size scalability in hash table}
+    \label{fig:size scalability HT}
+\end{figure*}
+
+\newpage
+\section{MAX\_TRIES Evaluation Graphs}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\hspace{10cm}
+	\textit{Update heavy}\par
+        \medskip
+        \includegraphics[height=.02\textwidth]{graphs/SkipList/legend_retries_overhead.png}\par\vspace{0.5em}
+	MAX\_TRIES effect on non-size operations' performance in skip list\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-max-retries_united_SkipList_1000000setSize_3ins-2rem_1sizeThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/overhead-max-retries_united_SkipList_1000000setSize_30ins-20rem_1sizeThreads_0delay_bars.png}\vspace{-1.2em}
+
+        \vspace{1.2em}
+	MAX\_TRIES effect on size operations' performance in skip list\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/scalability-max-retries_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/SkipList/scalability-max-retries_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay_bars.png}\vspace{-1.2em}
+        \medskip
+        \medskip
+        \caption{MAX\_TRIES measurements in skip list}\par
+	\label{fig:MAX_TRIES SL}
+\end{figure*}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\hspace{10cm}
+	\textit{Update heavy}\par
+        \medskip
+    \includegraphics[height=.02\textwidth]{graphs/BST/legend_retries_overhead.png}\par\vspace{0.5em}
+MAX\_TRIES effect on non-size operations' performance in BST\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-max-retries_united_BST_1000000setSize_3ins-2rem_1sizeThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/overhead-max-retries_united_BST_1000000setSize_30ins-20rem_1sizeThreads_0delay_bars.png}\vspace{-1.2em}
+
+        \vspace{1.2em}
+	MAX\_TRIES effect on size operations' performance in BST\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/scalability-max-retries_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/BST/scalability-max-retries_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay_bars.png}\vspace{-1.2em}
+	\caption{MAX\_TRIES measurements in BST}
+	\label{fig:MAX_TRIES BST}
+\end{figure*}
+
+\begin{figure*}[htbp]
+	\centering
+	\medskip
+	\textit{Read heavy}\hspace{10cm}
+	\textit{Update heavy}\par
+	\medskip
+	\includegraphics[height=.018\textwidth]{graphs/HashTable/legend_retries_overhead.png}\par\vspace{0.5em}
+    MAX\_TRIES effect on non-size operations' performance in hash table\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-max-retries_united_HashTable_1000000setSize_3ins-2rem_1sizeThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/overhead-max-retries_united_HashTable_1000000setSize_30ins-20rem_1sizeThreads_0delay_bars.png}\vspace{-1.2em}
+
+    	        \vspace{1.2em}
+	MAX\_TRIES effect on size operations' performance in hash table\par
+        \medskip
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/scalability-max-retries_sizeThreads_1000000setSize_3ins-2rem_32workloadThreads_0delay_bars.png}\hspace{2.5em}
+	\includegraphics[width=.37\textwidth,trim={0 0 0 .1cm}]{graphs/HashTable/scalability-max-retries_sizeThreads_1000000setSize_30ins-20rem_32workloadThreads_0delay_bars.png}\vspace{-1.2em}
+	\caption{MAX\_TRIES measurements in hash table}
+	\label{fig:MAX_TRIES HT}
+\end{figure*}
+\end{document}
