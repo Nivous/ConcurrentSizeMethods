@@ -1,0 +1,25 @@
+# Ignore build artifacts
+build/
+
+# Ignore experiment results and graphs
+results/
+graphs/
+
+# Ignore compiled Java classes and jars
+*.class
+*.jar
+
+# Ignore temporary files
+*~
+*.tmp
+
+# Ignore Python bytecode
+__pycache__/
+*.pyc
+
+# Ignore latex auxiliary files
+*.aux
+*.log
+
+# Ignore LaTeX output files
+graphs_gen.pdf
