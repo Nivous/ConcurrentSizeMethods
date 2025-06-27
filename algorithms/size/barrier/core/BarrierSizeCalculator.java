@@ -25,6 +25,9 @@ package algorithms.size.barrier.core;
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
+import algorithms.size.barrier.core.IdleTimeDynamicBarrierImpl;
+
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
@@ -38,25 +41,18 @@ public class BarrierSizeCalculator<V> {
     // Each long is 8 bytes; PADDING longs provide 8 * PADDING bytes of padding
     // to prevent false sharing
     private static final int PADDING = Padding.PADDING;
-    
+
     // Core data structures for tracking operations
     // Adding +1 to array sizes provides padding before the array to prevent false sharing with thread 0
-    private final long[] sizePhase = new long[PADDING];
     private final long[][] metadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING]; 
     private final long[][] fastMetadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING];
-    private final long[][] opPhase = new long[ThreadID.MAX_THREADS + 1][PADDING];
     private volatile CountersSnapshot countersSnapshot = new CountersSnapshot().deactivate();
+    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
 
     /**
      * Initializes a new HandshakeSizeCalculator with default state.
      */
     public BarrierSizeCalculator() {
-        // Initialize size phase to 4 (idle state)
-        SIZE_PHASE.setVolatile(sizePhase, 0, 4);
-        // Initialize all threads to idle phase
-        for (int i = 0; i <= ThreadID.MAX_THREADS; i++) {
-            OP_PHASE.setVolatile(opPhase[i], 0, SizePhases.IDLE_PHASE);
-        }
     }
 
     /**
@@ -77,7 +73,10 @@ public class BarrierSizeCalculator<V> {
         // Set fast size and collect metadata
         activeCountersSnapshot.setFastSize(count);
         collect(activeCountersSnapshot);
-        
+
+        barrier.trigger(); // Trigger next size phase, to reveret threads to fast path
+        barrier.await(); // Wait for all threads to reach next size phase
+
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
         
@@ -170,19 +169,8 @@ public class BarrierSizeCalculator<V> {
      * 
      * @param modifiedOpPhase the phase to set
      */
-    public void setOpPhase(long modifiedOpPhase) {
-        int tid = ThreadID.threadID.get();
-        opPhase[tid + 1][0] = modifiedOpPhase;
-    }
-    
-    /**
-     * Sets the current phase for the calling thread with volatile semantics.
-     * 
-     * @param opPhase the phase to set
-     */
-    public void setOpPhaseVolatile(long modifiedOpPhase) {
-        int tid = ThreadID.threadID.get();
-        OP_PHASE.setVolatile(opPhase[tid + 1], 0, modifiedOpPhase);
+    public void registerToBarrier() {
+        barrier.register(); // Register to barrier
     }
 
     /**
@@ -191,33 +179,7 @@ public class BarrierSizeCalculator<V> {
      * @return the current size phase
      */
     public long getSizePhase() {
-        return (long) SIZE_PHASE.getVolatile(sizePhase, 0);
-    }
-
-    /**
-     * Performs a handshake by waiting until all threads have reached the specified phase.
-     * 
-     * @param handshakePhase the phase to wait for
-     */
-    private void performHandshake(long handshakePhase) {
-        long threadOpPhase;
-        int nextId = ThreadID.nextId.get();
-        
-        for (int i = 0; i < nextId; ) {
-            // Skip current thread
-            if (i == ThreadID.threadID.get()) {
-                i++;
-                continue;
-            }
-            
-            // Check if thread is caught up or idle
-            if (!((threadOpPhase = (long) OP_PHASE.getVolatile(opPhase[i + 1], 0)) != SizePhases.IDLE_PHASE
-                    && threadOpPhase < handshakePhase)) {
-                // Thread i is caught up to handshake phase or is in idle
-                i++;
-            }
-            // Otherwise, wait for thread i to catch up
-        }
+        return (long) barrier.getThreadPhase(); // Get current phase
     }
 
     /**
@@ -226,7 +188,7 @@ public class BarrierSizeCalculator<V> {
      * @param currentCountersSnapshot active snapshot
      * @return computed size
      */
-    private int helpHandshakesAndComputeSize(CountersSnapshot currentCountersSnapshot) {
+    private int waitForSizeComputation(CountersSnapshot currentCountersSnapshot) {
         while (true) {
             long currentSize = currentCountersSnapshot.retrieveSize();
             if (currentSize != CountersSnapshot.INVALID_SIZE) {
@@ -256,37 +218,15 @@ public class BarrierSizeCalculator<V> {
 
             if (witnessedCountersSnapshot == currentCountersSnapshot) {
                 // We're in charge of size computation
-                currentSizePhase = (long) SIZE_PHASE.getVolatile(sizePhase, 0);
-                
-                // Handle potential phase conflict
-                if ((currentSizePhase & 3) == 2) {
-                    if (SIZE_PHASE.compareAndSet(sizePhase, 0, currentSizePhase, currentSizePhase + 4)) {
-                        currentSizePhase += 4;
-                    } else {
-                        currentSizePhase += 2;
-                    }
-                }
-
-                // Perform handshake sequence if in appropriate phase
-                if ((currentSizePhase & 3) == 0) {
-                    // First handshake
-                    SIZE_PHASE.setVolatile(sizePhase, 0, currentSizePhase + 1);
-                    performHandshake(currentSizePhase + 1);
-                    currentSizePhase++;
-                    
-                    // Second handshake
-                    SIZE_PHASE.setVolatile(sizePhase, 0, currentSizePhase + 1);
-                    performHandshake(currentSizePhase + 1);
-                    currentSizePhase++;
-                }
+                barrier.trigger(); // Trigger next size phase, to move the threads to slow path
+                barrier.register(); // Register to barrier                
                 
                 // Compute size and return to idle state
                 int sz = (int) tryCompute();
-                SIZE_PHASE.compareAndSet(sizePhase, 0, currentSizePhase, currentSizePhase + 2);
                 return sz;
             } else {
                 // Another thread took control, help it
-                return helpHandshakesAndComputeSize(witnessedCountersSnapshot);
+                return waitForSizeComputation(witnessedCountersSnapshot);
             }
         }
     }
