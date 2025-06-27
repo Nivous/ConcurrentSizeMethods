@@ -74,8 +74,8 @@ public class BarrierSizeCalculator<V> {
         activeCountersSnapshot.setFastSize(count);
         collect(activeCountersSnapshot);
 
-        barrier.trigger(); // Trigger next size phase, to reveret threads to fast path
-        barrier.await(); // Wait for all threads to reach next size phase
+        invokeNextSizePhase(); // Trigger next size phase, to reveret threads to fast path
+        awaitForThreadSynchronization(); // Wait for all threads to reach next size phase
 
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
@@ -165,21 +165,38 @@ public class BarrierSizeCalculator<V> {
     }
 
     /**
-     * Sets the current phase for the calling thread.
-     * 
-     * @param modifiedOpPhase the phase to set
+     * Invoke the next size phase
      */
-    public void registerToBarrier() {
+    public void invokeNextSizePhase() {
+        barrier.trigger(); // Trigger next size phase, to move the threads to slow path
+    }
+    
+    /**
+     * Gets the current size computation phase.
+     */
+    public long getSizePhase() {
+        return (long) barrier.getThreadPhase(); // Get current phase
+    }
+
+    /**
+     * Register to the barrier to synchronize with size operations
+     */
+    public void registerToTheBarrier() {
         barrier.register(); // Register to barrier
     }
 
     /**
-     * Gets the current size computation phase.
-     * 
-     * @return the current size phase
+     * Leave the barrier to avoid synchronization with size operations
      */
-    public long getSizePhase() {
-        return (long) barrier.getThreadPhase(); // Get current phase
+    public void leaveTheBarrier() {
+        barrier.leave();
+    }
+
+    /**
+     * Await for thread synchronization to end size operation
+     */
+    public void awaitForThreadSynchronization() {
+        barrier.await();
     }
 
     /**
@@ -218,8 +235,8 @@ public class BarrierSizeCalculator<V> {
 
             if (witnessedCountersSnapshot == currentCountersSnapshot) {
                 // We're in charge of size computation
-                barrier.trigger(); // Trigger next size phase, to move the threads to slow path
-                barrier.register(); // Register to barrier                
+                invokeNextSizePhase(); // Trigger next size phase, to move the threads to slow path
+                registerToTheBarrier(); // Register to barrier                
                 
                 // Compute size and return to idle state
                 int sz = (int) tryCompute();

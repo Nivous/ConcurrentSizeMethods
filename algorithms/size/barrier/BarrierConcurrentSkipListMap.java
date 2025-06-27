@@ -337,6 +337,13 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     /* ----------------  Utilities -------------- */
 
     /**
+     * Checks If a thread should operate in the slow path or fast path by parity of the size phase.
+     */
+    private boolean useFastPath(long sizePhase) {
+        return (sizePhase & 1) == 0;
+    }
+
+    /**
      * Compares using comparator or natural ordering if null.
      * Called only by methods that have performed required type checks.
      */
@@ -619,15 +626,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      */
     private V doPut(K key, V value, boolean onlyIfAbsent) {
         V ret;
-        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        sizeCalculator.registerToTheBarrier();
         long currentSizePhase = sizeCalculator.getSizePhase();
-        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
             ret = fast_doPut(key, value, onlyIfAbsent);
         } else { // A size operation is currently in progress. Switch to the slow path.
-            sizeCalculator.setOpPhase(currentSizePhase);
             ret = slow_doPut(key, value, onlyIfAbsent);
         }
-        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        sizeCalculator.leaveTheBarrier();
         return ret;
     }
     
@@ -838,15 +844,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      */
     final V doRemove(Object key, Object value) {
         V ret;
-        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        sizeCalculator.registerToTheBarrier();
         long currentSizePhase = sizeCalculator.getSizePhase();
-        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
             ret = fast_doRemove(key, value);
         } else { // A size operation is currently in progress. Switch to the slow path.
-            sizeCalculator.setOpPhase(currentSizePhase);
             ret = slow_doRemove(key, value);
         }
-        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        sizeCalculator.leaveTheBarrier();
         return ret;
     }
     

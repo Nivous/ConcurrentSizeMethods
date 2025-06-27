@@ -190,15 +190,14 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V putIfAbsent(final K key, final V value) {
         V ret;
-        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        sizeCalculator.registerToTheBarrier();
         long currentSizePhase = sizeCalculator.getSizePhase();
-        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
             ret = fast_putIfAbsent(key, value);
         } else { // A size operation is currently in progress. Switch to the slow path.
-            sizeCalculator.setOpPhase(currentSizePhase);
             ret = slow_putIfAbsent(key, value);
         }
-        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        sizeCalculator.leaveTheBarrier();
         return ret;
     }
 
@@ -207,15 +206,14 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V put(final K key, final V value) {
         V ret;
-        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        sizeCalculator.registerToTheBarrier();
         long currentSizePhase = sizeCalculator.getSizePhase();
-        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
             ret = fast_put(key, value);
         } else { // A size operation is currently in progress. Switch to the slow path.
-            sizeCalculator.setOpPhase(currentSizePhase);
             ret = slow_put(key, value);
         }
-        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        sizeCalculator.leaveTheBarrier();
         return ret;
     }
 
@@ -224,15 +222,14 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V remove(final K key) {
         if (key == null) throw new NullPointerException();
         V ret;
-        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        sizeCalculator.registerToTheBarrier();
         long currentSizePhase = sizeCalculator.getSizePhase();
-        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
             ret = fast_remove(key);
         } else { // A size operation is currently in progress. Switch to the slow path.
-            sizeCalculator.setOpPhase(currentSizePhase);
             ret = slow_remove(key);
         }
-        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        sizeCalculator.leaveTheBarrier();
         return ret;
     }
 
@@ -732,6 +729,13 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         final Node<K, V> other = (info.p.right == info.l) ? info.p.left : info.p.right;
         (info.gp.left == info.p ? leftUpdater : rightUpdater).compareAndSet(info.gp, info.p, other);
         infoUpdater.compareAndSet(info.gp, info, new Clean());
+    }
+
+    /**
+     * Checks If a thread should operate in the slow path or fast path by parity of the size phase.
+     */
+    private boolean useFastPath(long sizePhase) {
+        return (sizePhase & 1) == 0;
     }
 
     /**
