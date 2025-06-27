@@ -1,11 +1,12 @@
 package algorithms.size.barrier.core;
-
-import java.util.concurrent.atomic.AtomicLong;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 
 public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
+
     // Implementation variables
-    private AtomicLong sensePhase;
-    private AtomicLong paritySizeWaiting;
+    private volatile long sensePhase = 0;
+    private volatile long paritySizeWaiting = 0;
     private ThreadLocal<Long> threadPhase = new ThreadLocal<>();
 
     // Helper fields
@@ -21,13 +22,11 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     private static final long sizeIncrementValue = 1L << 31;
 
     public IdleTimeDynamicBarrierImpl() {
-        sensePhase = new AtomicLong(0L);
-        paritySizeWaiting = new AtomicLong(0L);
     }
 
     @Override
     public long getPhase() {
-        return sensePhase.get() & phaseMask;
+        return ((long) SENSE_PHASE.getVolatile(this)) & phaseMask;
     }
 
     @Override
@@ -37,10 +36,10 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
 
     @Override
     public void register() {
-        paritySizeWaiting.getAndAdd(sizeIncrementValue);
+        PARITY_SIZE_WAITING.getAndAdd(this, sizeIncrementValue);
         threadPhase.set(getPhase());
         if (isBarrierActive()) {
-            long localParity = paritySizeWaiting.getAndIncrement() >>> parityShift;
+            long localParity = ((long) PARITY_SIZE_WAITING.getAndAdd(this, 1)) >>> parityShift;
             if (isIncrementForIncorrectPhase(localParity))
                 threadPhase.set(threadPhase.get() + 1);
             while (isBarrierActive()) {
@@ -55,7 +54,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
         if (threadInSamePhase())
             return;
         incrementThreadPhase();
-        paritySizeWaiting.getAndIncrement();
+        PARITY_SIZE_WAITING.getAndAdd(this, 1);
         while (isBarrierActive()) {
             if (allActiveThreadsBlocked())
                 deactivateBarrier();
@@ -64,22 +63,22 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
 
     @Override
     public void leave() {
-        paritySizeWaiting.getAndAdd(-sizeIncrementValue);
+        PARITY_SIZE_WAITING.getAndAdd(-sizeIncrementValue);
     }
 
     @Override
     public void trigger() {
         prepareNextPhase();
-        sensePhase.getAndIncrement();
+        SENSE_PHASE.getAndAdd(this, 1);
         if (noActiveThreads())
-            sensePhase.set((sensePhase.get() & phaseMask) + (getPhaseLSB() << senseShift));
+            SENSE_PHASE.setOpaque(this, ((((long) SENSE_PHASE.getOpaque(this)) & phaseMask) + (getPhaseLSB() << senseShift)));
     }
 
     private void prepareNextPhase() {
-        long expectedValue = paritySizeWaiting.get();
+        long expectedValue = (long) PARITY_SIZE_WAITING.getOpaque(this);
         long newValue = ((1L - (expectedValue >>> parityShift)) << parityShift) + (expectedValue & sizeMask);
-        while(!paritySizeWaiting.compareAndSet(expectedValue, newValue)) {
-            expectedValue = paritySizeWaiting.get();
+        while(!PARITY_SIZE_WAITING.compareAndSet(this, expectedValue, newValue)) {
+            expectedValue = (long) PARITY_SIZE_WAITING.getOpaque(this);
             newValue = ((1L - (expectedValue >>> parityShift)) << parityShift) + (expectedValue & sizeMask);
         }
     }
@@ -89,7 +88,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private long getPhaseLSB() {
-        return sensePhase.get() & 0x1;
+        return ((long) SENSE_PHASE.getVolatile(this)) & 0x1;
     }
 
     private long getThreadPhaseLSB() {
@@ -97,7 +96,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private boolean threadInSamePhase() {
-        return threadPhase.get() == (sensePhase.get() & phaseMask);
+        return threadPhase.get() == (((long) SENSE_PHASE.getVolatile(this)) & phaseMask);
     }
 
     private void incrementThreadPhase() {
@@ -105,21 +104,21 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private long numberOfActiveThreads() {
-        return (paritySizeWaiting.get() & sizeMask) >>> sizeShift;
+        return (((long) PARITY_SIZE_WAITING.getVolatile(this)) & sizeMask) >>> sizeShift;
     }
 
     private long numberOfWaitingThreads() {
-        return paritySizeWaiting.get() & waitingMask;
+        return ((long) PARITY_SIZE_WAITING.getVolatile(this)) & waitingMask;
     }
 
     private void deactivateBarrier() {
         long expectedValue = threadPhase.get() + ((1L - getThreadPhaseLSB()) << senseShift);
         long newValue = threadPhase.get() + (getThreadPhaseLSB() << senseShift);
-        sensePhase.compareAndSet(expectedValue, newValue);
+        SENSE_PHASE.compareAndSet(this, expectedValue, newValue);
     }
 
     private boolean allActiveThreadsBlocked() {
-        long localValue = paritySizeWaiting.get();
+        long localValue = (long) PARITY_SIZE_WAITING.getVolatile(this);
         return ((localValue & sizeMask) >>> sizeShift) == (localValue & waitingMask);
     }
 
@@ -128,6 +127,20 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private boolean isBarrierActive() {
-        return ((sensePhase.get() & senseMask) >>> senseShift) != getThreadPhaseLSB();
+        return ((((long) SENSE_PHASE.getVolatile(this) & senseMask)) >>> senseShift) != getThreadPhaseLSB();
+    }
+
+    // VarHandle mechanics
+    private static final VarHandle SENSE_PHASE;
+    private static final VarHandle PARITY_SIZE_WAITING;
+
+    static {
+        try {
+            MethodHandles.Lookup l = MethodHandles.lookup();
+            SENSE_PHASE = l.findVarHandle(IdleTimeDynamicBarrierImpl.class, "sensePhase", long.class);
+            PARITY_SIZE_WAITING = l.findVarHandle(IdleTimeDynamicBarrierImpl.class, "paritySizeWaiting", long.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
     }
 }
