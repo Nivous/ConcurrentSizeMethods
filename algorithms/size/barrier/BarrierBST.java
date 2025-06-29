@@ -177,12 +177,30 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
 
     /** PRECONDITION: key CANNOT BE NULL **/
     public final boolean containsKey(final K key) {
-        return slow_get(key) != null;
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
+            ret = fast_get(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_get(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret != null;
     }
 
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V get(final K key) {
-        return slow_get(key);
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
+            ret = fast_get(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_get(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret;
     }
 
     // Insert key to dictionary, returns the previous value associated with the specified key,
@@ -285,6 +303,27 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         if (insertInfo != null) {
             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
             ((LeafNode<K, V>) l).insertInfo = null;
+        }
+        return ((LeafNode<K, V>) l).value;
+    }
+
+    public final V fast_get(final K key) {
+        if (key == null) throw new NullPointerException();
+        InternalNode<K, V> p = root;
+        Node<K, V> l = p.left;
+        while (l.getClass() == InternalNode.class) {
+            p = (InternalNode<K, V>) l;
+            l = (l.key == null || key.compareTo(l.key) < 0) ? ((InternalNode<K, V>) l).left : ((InternalNode<K, V>) l).right;
+        }
+        if (l.key == null || key.compareTo(l.key) != 0) { // l is a dummy leaf, or l.key != key
+            return null;
+        }
+        Info<K, V> pinfo = p.info;
+        // We might obtain pinfo when p is no longer l's parent. In that case, we return l.value, and that is fine:
+        // l might have already been removed by now, but only after its parent was changed from p to another node,
+        // so l has been in the tree at the moment it was obtained from p's child pointer.
+        if (pinfo != null && pinfo.getClass() == Mark.class && ((Mark<K, V>) pinfo).dinfo.l == l) { // l is considered removed
+            return null;
         }
         return ((LeafNode<K, V>) l).value;
     }

@@ -215,7 +215,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
             Object v;
             int c;
             K k = n.key;
-            if ((v = n.valOrRemoveInfo) == null || v instanceof UpdateInfo || k == null ||
+            if ((v = n.valOrRemoveInfo) == null || k == null ||
                     (c = cpr(cmp, key, k)) > 0)
                 b = n;
             else {
@@ -305,7 +305,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                     c = -1;
                 } else if ((k = n.key) == null)
                     break;                   // can't append; restart
-                else if ((v = n.valOrRemoveInfo) == null || v instanceof UpdateInfo) {
+                else if ((v = n.valOrRemoveInfo) == null) {
                     fast_completeRemove(b, n);
                     c = 1;
                 } else if ((c = cpr(cmp, key, k)) > 0)
@@ -396,7 +396,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                     break outer;
                 else if ((k = n.key) == null)
                     break;
-                else if ((v = n.valOrRemoveInfo) == null || v instanceof UpdateInfo)
+                else if ((v = n.valOrRemoveInfo) == null)
                     fast_completeRemove(b, n);
                 else if ((c = cpr(cmp, key, k)) > 0)
                     b = n;
@@ -495,7 +495,16 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public boolean containsKey(Object key) {
-        return get(key) != null;
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret != null;
     }
 
     /**
@@ -513,7 +522,16 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public V get(Object key) {
-        return slow_doGet(key);
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret;
     }
     
     private V slow_doGet(Object key) {
@@ -536,8 +554,16 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @since 1.8
      */
     public V getOrDefault(Object key, V defaultValue) {
-        V v;
-        return (v = slow_doGet(key)) == null ? defaultValue : v;
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret == null ? defaultValue : ret;
     }
 
     /**

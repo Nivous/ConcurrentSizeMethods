@@ -420,12 +420,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Returns an index node with key strictly less than given key.
      * Also unlinks indexes to deleted nodes found along the way.
      * Callers rely on this side-effect of clearing indices to deleted
-     * nodes.
+     * nodes. Used in slow mode.
      *
      * @param key if nonnull the key
      * @return a predecessor node of key, or null if uninitialized or null key
      */
-    private Node<K, V> findPredecessor(Object key, Comparator<? super K> cmp) {
+    private Node<K, V> slow_findPredecessor(Object key, Comparator<? super K> cmp) {
         Index<K, V> q;
         VarHandle.acquireFence();
         if ((q = head) == null || key == null) return null;
@@ -436,6 +436,35 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     K k;
                     Object valOrRemoveInfo;
                     if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
+                        RIGHT.compareAndSet(q, r, r.right);
+                    else if (cpr(cmp, key, k) > 0) q = r;
+                    else break;
+                }
+                if ((d = q.down) != null) q = d;
+                else return q.node;
+            }
+        }
+    }
+
+    /**
+     * Returns an index node with key strictly less than given key.
+     * Also unlinks indexes to deleted nodes found along the way.
+     * Callers rely on this side-effect of clearing indices to deleted
+     * nodes. Used in fast mode.
+     *
+     * @param key if nonnull the key
+     * @return a predecessor node of key, or null if uninitialized or null key
+     */
+    private Node<K, V> fast_findPredecessor(Object key, Comparator<? super K> cmp) {
+        Index<K, V> q;
+        VarHandle.acquireFence();
+        if ((q = head) == null || key == null) return null;
+        else {
+            for (Index<K, V> r, d; ; ) {
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    K k;
+                    if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null)
                         RIGHT.compareAndSet(q, r, r.right);
                     else if (cpr(cmp, key, k) > 0) q = r;
                     else break;
@@ -518,6 +547,61 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         }
         return result;
     }
+
+    /**
+     * Gets value for key with slow path. Same idea as findNode, except skips over
+     * deletions and markers, and returns first encountered value to
+     * avoid possibly inconsistent rereads.
+     *
+     * @param key the key
+     * @return the value, or null if absent
+     */
+    private V fast_doGet(Object key) {
+        Index<K, V> q;
+        VarHandle.acquireFence();
+        if (key == null) throw new NullPointerException();
+        Comparator<? super K> cmp = comparator;
+        V result = null;
+        if ((q = head) != null) {
+            outer:
+            for (Index<K, V> r, d; ; ) {
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    K k;
+                    Object valOrRemoveInfo;
+                    int c;
+                    if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null)
+                        RIGHT.compareAndSet(q, r, r.right);
+                    else if ((c = cpr(cmp, key, k)) > 0) q = r;
+                    else if (c == 0) {
+                        result = (V) valOrRemoveInfo;
+                        break outer;
+                    } else break;
+                }
+                if ((d = q.down) != null) q = d;
+                else {
+                    Node<K, V> b, n;
+                    if ((b = q.node) != null) {
+                        while ((n = b.next) != null) {
+                            Object valOrRemoveInfo;
+                            int c;
+                            K k = n.key;
+                            if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || k == null || (c = cpr(cmp, key, k)) > 0)
+                                b = n;
+                            else {
+                                if (c == 0) {
+                                    result = (V) valOrRemoveInfo;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return result;
+    }
     
     /* ---------------- Insertion -------------- */
 
@@ -526,7 +610,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * highest level of insertion, then recursively, to chain index
      * nodes to lower ones. Returns null on (staleness) failure,
      * disabling higher-level insertions. Recursion depths are
-     * exponentially less probable.
+     * exponentially less probable. Used in slow mode.
      *
      * @param q starting index for current level
      * @param skips levels to skip before inserting
@@ -573,14 +657,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * highest level of insertion, then recursively, to chain index
      * nodes to lower ones. Returns null on (staleness) failure,
      * disabling higher-level insertions. Recursion depths are
-     * exponentially less probable.
+     * exponentially less probable. Used in fast mode.
      *
      * @param q starting index for current level
      * @param skips levels to skip before inserting
      * @param x index for this insertion
      * @param cmp comparator
      */
-    static <K, V> boolean addIndices(Index<K, V> q, int skips, Index<K, V> x, Comparator<? super K> cmp) {
+    static <K, V> boolean fast_addIndices(Index<K, V> q, int skips, Index<K, V> x, Comparator<? super K> cmp) {
         Node<K, V> z;
         K key;
         if (x != null && (z = x.node) != null && (key = z.key) != null && q != null) { // hoist checks
@@ -591,8 +675,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 if ((r = q.right) != null) {
                     Node<K, V> p;
                     K k;
-                    Object valOrRemoveInfo;
-                    if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                    if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null) {
                         RIGHT.compareAndSet(q, r, r.right);
                         c = 0;
                     } else if ((c = cpr(cmp, key, k)) > 0) q = r;
@@ -603,7 +686,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     if ((d = q.down) != null && skips > 0) {
                         --skips;
                         q = d;
-                    } else if (d != null && !retrying && !addIndices(d, 0, x.down, cmp)) break;
+                    } else if (d != null && !retrying && !fast_addIndices(d, 0, x.down, cmp)) break;
                     else {
                         x.right = r;
                         if (RIGHT.compareAndSet(q, r, x)) return true;
@@ -731,7 +814,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         }
                         Object valOrRemoveInfo;
                         if ((valOrRemoveInfo = z.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
-                            findPredecessor(key, cmp); // clean
+                            slow_findPredecessor(key, cmp); // clean
                     }
                     return null;
                 }
@@ -760,8 +843,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     while ((r = q.right) != null) {
                         Node<K, V> p;
                         K k;
-                        Object valOrRemoveInfo;
-                        if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
+                        if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null)
                             RIGHT.compareAndSet(q, r, r.right);
                         else if (cpr(cmp, key, k) > 0) q = r;
                         else break;
@@ -787,7 +869,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                             cpr(cmp, key, key);
                         c = -1;
                     } else if ((k = n.key) == null) break; // can't append; restart
-                    else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                    else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null) {
                         unlinkNode(b, n);
                         c = 1;
                     } else if ((c = cpr(cmp, key, k)) > 0) b = n;
@@ -814,15 +896,15 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                             if (rnd >= 0L || --skips < 0) break;
                             else rnd <<= 1;
                         }
-                        if (slow_addIndices(h, skips, x, cmp) && skips < 0 && head == h) { // try to add new level
+                        if (fast_addIndices(h, skips, x, cmp) && skips < 0 && head == h) { // try to add new level
                             Index<K, V> hx = new Index<K, V>(z, x, null);
                             Index<K, V> nh = new Index<K, V>(h.node, h, hx);
                             HEAD.compareAndSet(this, h, nh);
                         }
                         Object valOrRemoveInfo;
-                        if ((valOrRemoveInfo = z.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) // deleted while adding
+                        if ((valOrRemoveInfo = z.valOrRemoveInfo) == null) // deleted while adding
                             // indices
-                            findPredecessor(key, cmp); // clean
+                            fast_findPredecessor(key, cmp); // clean
                     }
                     return null;
                 }
@@ -866,7 +948,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V result = null;
         Node<K, V> b;
         outer:
-        while ((b = findPredecessor(key, cmp)) != null && result == null) {
+        while ((b = slow_findPredecessor(key, cmp)) != null && result == null) {
             for (;;) {
                 Node<K, V> n;
                 K k;
@@ -918,7 +1000,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V result = null;
         Node<K, V> b;
         outer:
-        while ((b = findPredecessor(key, cmp)) != null && result == null) {
+        while ((b = fast_findPredecessor(key, cmp)) != null && result == null) {
             for (;;) {
                 Node<K, V> n;
                 K k;
@@ -926,7 +1008,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 int c;
                 if ((n = b.next) == null) break outer;
                 else if ((k = n.key) == null) break;
-                else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null) {
                     unlinkNode(b, n);
                 } else if ((c = cpr(cmp, key, k)) > 0) b = n;
                 else if (c < 0) break outer;
@@ -1009,7 +1091,16 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public boolean containsKey(Object key) {
-        return slow_doGet(key) != null;
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret != null;
     }
 
     /**
@@ -1027,7 +1118,16 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public V get(Object key) {
-        return slow_doGet(key);
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret;
     }
 
     /**
@@ -1042,8 +1142,16 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @since 1.8
      */
     public V getOrDefault(Object key, V defaultValue) {
-        V v;
-        return (v = slow_doGet(key)) == null ? defaultValue : v;
+        V ret;
+        sizeCalculator.registerToTheBarrier();
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if (useFastPath(currentSizePhase)) { // Enter the fast path
+            ret = fast_doGet(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            ret = slow_doGet(key);
+        }
+        sizeCalculator.leaveTheBarrier();
+        return ret == null ? defaultValue : ret;
     }
 
     /**
