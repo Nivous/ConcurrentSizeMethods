@@ -1263,10 +1263,8 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Only one thread can execute concurrently
     */
     public boolean cleanListOfUpdateInfoFields() {
-        ThreadID.updateFunc("cleanListOfUpdateInfoFields" + ", phase = " + sizeCalculator.getSizePhase(), true);
         cleanBaseLevel();
         cleanIndexLevels();
-        ThreadID.updateFunc(null, false);
         return true;
     }
 

@@ -774,7 +774,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
      * Checks If a thread should operate in the slow path or fast path by parity of the size phase.
      */
     private boolean useFastPath(long sizePhase) {
-        return (sizePhase & 1) == 0;
+        return (sizePhase & 0x1) == 0;
     }
 
     /**
