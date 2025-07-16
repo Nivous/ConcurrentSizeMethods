@@ -18,11 +18,12 @@ multicoreServer=T
 JVM_MEM=$([ "$multicoreServer" = "T" ] && echo "31G" || echo "8G")
 
 # Test run parameters
-warmupRepeats=5
-repeats=10
-runtime=5
+warmupRepeats=1
+repeats=2
+runtime=1
 defaultDSSize=1000000
 sizeDelay=700
+
 
 # Thread and retry configurations based on server type
 if [ "$multicoreServer" = "T" ]; then

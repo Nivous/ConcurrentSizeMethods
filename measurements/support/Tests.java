@@ -24,7 +24,7 @@ import measurements.adapters.*;
 
 public class Tests {
     static volatile boolean shouldRun = false;
-    static volatile boolean DEBUG_PRINTS = true;
+    static volatile boolean DEBUG_PRINTS = false;
 
     private static final int NUM_THREADS;
     static {

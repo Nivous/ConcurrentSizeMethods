@@ -34,7 +34,6 @@ import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateOperations;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.SizePhases;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
 
