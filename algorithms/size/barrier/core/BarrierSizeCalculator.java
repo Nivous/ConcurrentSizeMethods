@@ -24,10 +24,6 @@ package algorithms.size.barrier.core;
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
-
-import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrierImpl;
-
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
@@ -36,6 +32,7 @@ import measurements.support.Padding;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.function.Supplier;
 
 public class BarrierSizeCalculator<V> {
     // Each long is 8 bytes; PADDING longs provide 8 * PADDING bytes of padding
@@ -47,10 +44,19 @@ public class BarrierSizeCalculator<V> {
     private final long[][] metadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING]; 
     private final long[][] fastMetadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING];
     private volatile CountersSnapshot countersSnapshot = new CountersSnapshot().deactivate();
-    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
+    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl4();
+    //private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
+
+    
+    /**
+     * Initializes a new BarrierSizeCalculator with default state and a call back function.
+     */
+    public BarrierSizeCalculator(Supplier<Boolean> cb_func) {
+        barrier.setCBFunc(cb_func);
+    }
 
     /**
-     * Initializes a new HandshakeSizeCalculator with default state.
+     * Initializes a new BarrierSizeCalculator with default state.
      */
     public BarrierSizeCalculator() {
     }
@@ -74,8 +80,9 @@ public class BarrierSizeCalculator<V> {
         activeCountersSnapshot.setFastSize(count);
         collect(activeCountersSnapshot);
 
-        invokeNextSizePhase(); // Trigger next size phase, to reveret threads to fast path
+        invokeNextSizePhase(true); // Trigger next size phase, to reveret threads to fast path
         awaitForThreadSynchronization(); // Wait for all threads to reach next size phase
+        leaveTheBarrier();
 
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
@@ -167,8 +174,8 @@ public class BarrierSizeCalculator<V> {
     /**
      * Invoke the next size phase
      */
-    public void invokeNextSizePhase() {
-        barrier.trigger(); // Trigger next size phase, to move the threads to slow path
+    private void invokeNextSizePhase(boolean activate_cb) {
+        barrier.trigger(activate_cb); // Trigger next size phase, to move the threads to slow path
     }
     
     /**
@@ -221,12 +228,11 @@ public class BarrierSizeCalculator<V> {
      * @return the computed size
      */
     public int compute() {
-        long currentSizePhase;
         CountersSnapshot currentCountersSnapshot = (CountersSnapshot) COUNTERS_SNAPSHOT.getVolatile(this);
         
         // If another thread is already computing size, help it
         if (currentCountersSnapshot.isCollecting()) {
-            return helpHandshakesAndComputeSize(currentCountersSnapshot);
+            return waitForSizeComputation(currentCountersSnapshot);
         } else {
             // Try to take charge of size computation
             CountersSnapshot newCountersSnapshot = new CountersSnapshot();
@@ -235,8 +241,9 @@ public class BarrierSizeCalculator<V> {
 
             if (witnessedCountersSnapshot == currentCountersSnapshot) {
                 // We're in charge of size computation
-                invokeNextSizePhase(); // Trigger next size phase, to move the threads to slow path
-                registerToTheBarrier(); // Register to barrier                
+                
+                invokeNextSizePhase(false); // Trigger next size phase, to move the threads to slow path
+                registerToTheBarrier(); // Register to barrier
                 
                 // Compute size and return to idle state
                 int sz = (int) tryCompute();

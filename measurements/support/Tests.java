@@ -24,7 +24,7 @@ import measurements.adapters.*;
 
 public class Tests {
     static volatile boolean shouldRun = false;
-    static volatile boolean DEBUG_PRINTS = false;
+    static volatile boolean DEBUG_PRINTS = true;
 
     private static final int NUM_THREADS;
     static {
@@ -324,6 +324,11 @@ public class Tests {
         }
     }
 
+    static void printIfInDebugMode(String text) {
+        if (DEBUG_PRINTS)
+            System.out.println(text);
+    }
+
     static void insertDeleteOneKey(AbstractAdapter<Integer> set) {
         assert set.insert(10);
         assert set.contains(10);
@@ -332,8 +337,7 @@ public class Tests {
         assert set.remove(10);
         assert !set.remove(10);
         assert !set.contains(10);
-        if (DEBUG_PRINTS)
-            System.out.println(new Object() {
+        printIfInDebugMode(new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
     }
 
@@ -351,8 +355,7 @@ public class Tests {
         assert set.remove(15);
         assert !set.contains(15);
         assert !set.remove(15);
-        if (DEBUG_PRINTS)
-            System.out.println(new Object() {
+        printIfInDebugMode(new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
     }
 
@@ -395,8 +398,7 @@ public class Tests {
         keysInset--;
         if (isSizeSupported)
             assert set.size() == keysInset;
-        if (DEBUG_PRINTS)
-            System.out.println(new Object() {
+        printIfInDebugMode(new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
     }
 
@@ -451,8 +453,7 @@ public class Tests {
         assert set.remove(15);
         assert !set.contains(15);
 
-        if (DEBUG_PRINTS)
-            System.out.println(new Object() {
+        printIfInDebugMode(new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
     }
 
@@ -512,8 +513,7 @@ public class Tests {
             assert numKeys == set.size();
         }
 
-        if (DEBUG_PRINTS)
-            System.out.println("  " + new Object() {
+        printIfInDebugMode("  " + new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
         return keysum;
     }
@@ -564,8 +564,7 @@ public class Tests {
             assert targetSize == set.size();
         }
 
-        if (DEBUG_PRINTS)
-            System.out.println("  " + new Object() {
+        printIfInDebugMode("  " + new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
 
         return keysum;
@@ -639,8 +638,7 @@ public class Tests {
             assert set.size() == initialSize;
         }
 
-        if (DEBUG_PRINTS)
-            System.out.println("  " + new Object() {
+        printIfInDebugMode("  " + new Object() {
             }.getClass().getEnclosingMethod().getName() + ": OK");
 
         return keysum;
@@ -683,8 +681,9 @@ public class Tests {
         try {
             set.size();
             isSizeSupported = true;
+            System.out.println("[Testing size - size is supported]");
         } catch (UnsupportedOperationException e) {
-            System.out.println("[Not testing size - size not supported]");
+            System.out.println("[Not testing size - size is not supported]");
         }
 
         Random rng = new Random((int) System.nanoTime()); // produce a seed from current time
@@ -713,9 +712,7 @@ public class Tests {
                     // targetTotalSize after filling.
                 }
 
-                if (DEBUG_PRINTS)
-                    System.out
-                            .println("Testing with targetTotalSize=" + targetTotalSize + " and maxKey=" + maxKey + ":");
+                printIfInDebugMode("Testing with targetTotalSize=" + targetTotalSize + " and maxKey=" + maxKey + ":");
 
                 assert fill(set, targetTotalSize, maxKey, experimentRng, isSizeSupported, false) +
                         insertRemoveAlternately(set, targetTotalSize, maxKey, experimentRng, isSizeSupported,
@@ -731,8 +728,7 @@ public class Tests {
                     // filling.
                 }
 
-                if (DEBUG_PRINTS)
-                    System.out.println("Testing threads on separate ranges with targetTotalSize=" + targetTotalSize
+                printIfInDebugMode("Testing threads on separate ranges with targetTotalSize=" + targetTotalSize
                             + " and maxKey=" + maxKey + ":");
 
                 assert fill(set, targetTotalSize, maxKey, experimentRng, isSizeSupported, true) +

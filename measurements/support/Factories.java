@@ -13,6 +13,9 @@ import algorithms.size.locks.stampedlock.StampedLockHashTable;
 import algorithms.size.optimistic.OptimisticSizeBST;
 import algorithms.size.optimistic.OptimisticSizeConcurrentSkipListMap;
 import algorithms.size.optimistic.OptimisticSizeHashTable;
+import algorithms.size.barrier.BarrierBST;
+import algorithms.size.barrier.BarrierConcurrentSkipListMap;
+import algorithms.size.barrier.BarrierHashTable;
 
 import measurements.adapters.*;
 import java.util.ArrayList;
@@ -22,6 +25,8 @@ public class Factories {
     public static final ArrayList<SetFactory<Integer>> factories = new ArrayList<SetFactory<Integer>>();
 
     static {
+        if (0 == 1) {
+
         factories.add(new ConcurrentSkipListMapFactory<Integer>());
         factories.add(new LockFreeBSTFactory<Integer>());
         factories.add(new HashTableFactory<Integer>());
@@ -41,6 +46,11 @@ public class Factories {
         factories.add(new StampedLockConcurrentSkipListMapFactory<Integer>());
         factories.add(new StampedLockBSTFactory<Integer>());
         factories.add(new StampedLockHashTableFactory<Integer>());
+        }
+
+        factories.add(new BarrierConcurrentSkipListMapFactory<Integer>());
+        factories.add(new BarrierBSTFactory<Integer>());
+        factories.add(new BarrierHashTableFactory<Integer>());
     }
 
     // factory classes for each supported data structure
@@ -205,6 +215,36 @@ public class Factories {
 
         public String getName() {
             return "StampedLockHashTable";
+        }
+    }
+
+    protected static class BarrierConcurrentSkipListMapFactory<K extends Comparable<? super K>> extends SetFactory<K> {
+        public SetInterface<K> newSet(final Integer param1, final Integer param2) {
+            return new SizeAdapter<K>(new BarrierConcurrentSkipListMap<K, K>());
+        }
+
+        public String getName() {
+            return "BarrierSkipList";
+        }
+    }
+
+    protected static class BarrierBSTFactory<K extends Comparable<? super K>> extends SetFactory<K> {
+        public SetInterface<K> newSet(final Integer param1, final Integer param2) {
+            return new SizeAdapter<K>(new BarrierBST<K, K>());
+        }
+
+        public String getName() {
+            return "BarrierBST";
+        }
+    }
+
+    protected static class BarrierHashTableFactory<K extends Comparable<? super K>> extends SetFactory<K> {
+        public SetInterface<K> newSet(final Integer param1, final Integer param2) {
+            return new SizeAdapter<K>(new BarrierHashTable<K, K>(param1));
+        }
+
+        public String getName() {
+            return "BarrierHashTable";
         }
     }
 }

@@ -11,4 +11,5 @@ dataStructures = [
     "HashTable", "SizeHashTable", "OptimisticSizeHashTable", "HandshakesHashTable", "StampedLockHashTable",
     "SkipList", "SizeSkipList", "OptimisticSizeSkipList", "HandshakesSkipList", "StampedLockSkipList",
     "BST", "SizeBST", "OptimisticSizeBST", "HandshakesBST", "StampedLockBST",
+    "BarrierBST", "BarrierSkipList", "BarrierHashTable",
 ]

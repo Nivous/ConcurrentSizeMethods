@@ -27,9 +27,9 @@ columns = [
 
 # Mapping from baseline data structure to its size-aware variants
 sizeDataStrucutres = {
-    "BST": ["SizeBST", "OptimisticSizeBST", "HandshakesBST", "StampedLockBST"],
-    "SkipList": ["SizeSkipList", "OptimisticSizeSkipList", "HandshakesSkipList", "StampedLockSkipList"],
-    "HashTable": ["SizeHashTable", "OptimisticSizeHashTable", "HandshakesHashTable", "StampedLockHashTable"],
+    "BST": ["SizeBST", "OptimisticSizeBST", "HandshakesBST", "StampedLockBST", "BarrierBST"],
+    "SkipList": ["SizeSkipList", "OptimisticSizeSkipList", "HandshakesSkipList", "StampedLockSkipList", "BarrierSkipList"],
+    "HashTable": ["SizeHashTable", "OptimisticSizeHashTable", "HandshakesHashTable", "StampedLockHashTable", "BarrierHashTable"],
 }
 
 def flatten(l: List[List[str]]) -> List[str]:

@@ -288,7 +288,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     final Comparator<? super K> comparator;
     
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator(this::cleanListOfUpdateInfoFields);
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -456,6 +456,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @return a predecessor node of key, or null if uninitialized or null key
      */
     private Node<K, V> fast_findPredecessor(Object key, Comparator<? super K> cmp) {
+        Node<K,V> res;
         Index<K, V> q;
         VarHandle.acquireFence();
         if ((q = head) == null || key == null) return null;
@@ -463,14 +464,15 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
             for (Index<K, V> r, d; ; ) {
                 while ((r = q.right) != null) {
                     Node<K, V> p;
-                    K k;
+                    K k;    
                     if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null)
                         RIGHT.compareAndSet(q, r, r.right);
                     else if (cpr(cmp, key, k) > 0) q = r;
-                    else break;
+                        else break;
                 }
                 if ((d = q.down) != null) q = d;
-                else return q.node;
+                else
+                    return q.node;
             }
         }
     }
@@ -872,7 +874,8 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null) {
                         unlinkNode(b, n);
                         c = 1;
-                    } else if ((c = cpr(cmp, key, k)) > 0) b = n;
+                    }
+                    else if ((c = cpr(cmp, key, k)) > 0) b = n;
                     else if (c == 0 && (onlyIfAbsent || VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, value))) {
                         return (V) valOrRemoveInfo;
                     }
@@ -901,9 +904,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                             Index<K, V> nh = new Index<K, V>(h.node, h, hx);
                             HEAD.compareAndSet(this, h, nh);
                         }
-                        Object valOrRemoveInfo;
-                        if ((valOrRemoveInfo = z.valOrRemoveInfo) == null) // deleted while adding
-                            // indices
+                        if (z.valOrRemoveInfo == null) // deleted while adding indices
                             fast_findPredecessor(key, cmp); // clean
                     }
                     return null;
@@ -1192,7 +1193,9 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      */
     public int size() {
         long c;
-        return ((c = sizeCalculator.compute()) >= Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) c;
+        int res = ((c = sizeCalculator.compute()) >= Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) c;
+        return res;
+        
     }
 
     /* ------ ConcurrentMap API methods ------ */
@@ -1254,6 +1257,80 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+    /* For cleaning the skip list of UpdateInfo fields 
+     * Only one thread can execute concurrently
+    */
+    public boolean cleanListOfUpdateInfoFields() {
+        ThreadID.updateFunc("cleanListOfUpdateInfoFields" + ", phase = " + sizeCalculator.getSizePhase(), true);
+        cleanBaseLevel();
+        cleanIndexLevels();
+        ThreadID.updateFunc(null, false);
+        return true;
+    }
+
+    private void cleanIndexLevels()
+    {
+        Index<K, V> h;
+        VarHandle.acquireFence();
+        if ((h = head) == null)
+            return;
+        else {
+            Index<K, V> q = h, r, d;
+            d = q;
+            for (;;) {
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    Object valOrRemoveInfo;
+                    if ((p = r.node) == null || p.key == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
+                        RIGHT.compareAndSet(q, r, r.right);
+                    else
+                        q = r;
+                }
+                q = d.down;
+                if (q == null)
+                    break;
+                else
+                    d = q;
+            }
+        }
+    }
+
+    private void cleanBaseLevel() {
+        Node<K, V> b = baseHead();
+        if (b == null)
+            return;
+        for (;;) {
+            Node<K,V> n; Object valOrRemoveInfo;
+            if ((n = b.next) == null)
+                break;
+            else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || valOrRemoveInfo instanceof UpdateInfo) {
+                VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
+                unlinkNode(b, n);
+            }
+            else
+                b = n;
+        }
+    }
+
+    private boolean ensureListIsClean() {
+        Node<K, V> b = baseHead();
+        String res = "";
+        if (b == null)
+            return true;
+        for (;;) {
+            Node<K,V> n;
+            if ((n = b.next) == null)
+                break;
+            else if (n.valOrRemoveInfo instanceof UpdateInfo)
+                return false;
+            else {
+                res += n.valOrRemoveInfo + ", ";
+                b = n;
+            }
+        }
+        return true;
     }
 
     /**

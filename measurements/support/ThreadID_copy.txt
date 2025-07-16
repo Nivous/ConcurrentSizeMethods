@@ -32,9 +32,6 @@ public class ThreadID {
   public static final int MAX_THREADS = 128;
   static PriorityBlockingQueue<Integer> pQueue = new PriorityBlockingQueue<Integer>(MAX_THREADS);
   public static AtomicInteger nextId = new AtomicInteger(0);
-  private static boolean [] inCBFunc = new boolean[MAX_THREADS];
-
-  private static String [] funcs = new String[MAX_THREADS];
 
   public static void register() {
     if (threadID.get() != null)
@@ -60,47 +57,5 @@ public class ThreadID {
     pQueue.add(tid);
     threadID.set(null); // this can be replaced with threadID.remove(); to 
                         // avoid memory leaks in case of long-running threads 
-  }
-
-  public static void updateFunc(String func, boolean in_cb) {
-    Integer tid = threadID.get();
-    if (tid == null) {
-      System.out.println("Thread ID is null");
-      return;
-    }
-    funcs[tid] = func;
-    if (func != null && in_cb)
-      inCBFunc[tid] = true;
-    else
-      inCBFunc[tid] = false;
-
-    ensureSingleCBFuncThread();
-  }
-
-  private static void ensureSingleCBFuncThread() {
-    boolean found = false;
-    String res = "";
-    int max_id = nextId.get();
-    for (int i = 0; i < max_id; i++) {
-      if (inCBFunc[i] && found) {
-        for (int j = 0; j < max_id; j++) {
-          if (inCBFunc[i])
-            res += i + ", ";
-        }
-        System.out.println("Found several threads in call back function: " + res);
-      }
-      if (inCBFunc[i])
-        found = true;
-    }
-  }
-
-  public static void printFuncs() {
-    int id = threadID.get();
-    int max_id = nextId.get();
-    for (int i = 0; i < max_id; i++) {
-      //if (i > 10 && i != 127)
-      //  continue;
-      System.out.println("Thread: " + id + ", Thread number " + i + " is in func: " + funcs[i]);
-    }
   }
 }

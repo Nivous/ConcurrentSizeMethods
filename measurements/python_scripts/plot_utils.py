@@ -35,18 +35,21 @@ names = {'BST': 'BST',
          'OptimisticSizeBST': 'OptimisticBST',
          'HandshakesBST': 'HandshakesBST',
          'StampedLockBST': 'StampedLockBST',
+         'BarrierBST': 'BarrierBST',
 
          'SkipList': 'SkipList',
          'SizeSkipList': 'SP-SkipList',
          'OptimisticSizeSkipList': 'OptimisticSkipList',
          'HandshakesSkipList': 'HandshakesSkipList',
          'StampedLockSkipList': 'StampedLockSkipList',
+         'BarrierSkipList': 'BarrierSkipList',
 
          'HashTable': 'HashTable',
          'SizeHashTable': 'SP-HashTable',
          'OptimisticSizeHashTable': 'OptimisticHashTable',
          'HandshakesHashTable': 'HandshakesHashTable',
          'StampedLockHashTable': 'StampedLockHashTable',
+         'BarrierHashTable': 'BarrierHashTable',
 
          }
 colors = {
@@ -55,18 +58,21 @@ colors = {
     'OptimisticSizeBST': 'C9',
     'HandshakesBST': 'C6',
     'StampedLockBST': 'C3',
+    'BarrierBST': 'C4',
 
     'SkipList': 'C0',
     'SizeSkipList': 'C2',
     'OptimisticSizeSkipList': 'C9',
     'HandshakesSkipList': 'C6',
     'StampedLockSkipList': 'C3',
+    'BarrierSkipList': 'C4',
 
     'HashTable': 'C0',
     'SizeHashTable': 'C2',
     'OptimisticSizeHashTable': 'C9',
     'HandshakesHashTable': 'C6',
     'StampedLockHashTable': 'C3',
+    'BarrierHashTable': 'C4',
 }
 
 linestyles = {
@@ -75,18 +81,21 @@ linestyles = {
     'OptimisticSizeBST': ':',
     'HandshakesBST': ':',
     'StampedLockBST': ':',
+    'BarrierBST': ':',
 
     'SkipList': '-',
     'SizeSkipList': ':',
     'OptimisticSizeSkipList': ':',
     'HandshakesSkipList': ':',
     'StampedLockSkipList': ':',
+    'BarrierSkipList': ':',
 
     'HashTable': '-',
     'SizeHashTable': ':',
     'OptimisticSizeHashTable': ':',
     'HandshakesHashTable': ':',
     'StampedLockHashTable': ':',
+    'BarrierHashTable': ':',
 
 }
 
@@ -96,18 +105,21 @@ markers = {
     'OptimisticSizeBST': '*',
     'HandshakesBST': '2',
     'StampedLockBST': '*',
+    'BarrierBST': '1',
 
     'SkipList': '+',
     'SizeSkipList': 'P',
     'OptimisticSizeSkipList': '*',
     'HandshakesSkipList': '2',
     'StampedLockSkipList': '*',
+    'BarrierSkipList': '1',
 
     'HashTable': '.',
     'SizeHashTable': 'o',
     'OptimisticSizeHashTable': '*',
     'HandshakesHashTable': '2',
     'StampedLockHashTable': '*',
+    'BarrierHashTable': '1',
 }
 
 # Ordering used for graph legends
@@ -117,18 +129,21 @@ algs_order = [
     "OptimisticSizeHashTable",
     "HandshakesHashTable",
     "StampedLockHashTable",
+    "BarrierHashTable",
 
     "SkipList",
     "SizeSkipList",
     "OptimisticSizeSkipList",
     "HandshakesSkipList",
     "StampedLockSkipList",
+    "BarrierSkipList",
 
     "BST",
     "SizeBST",
     "OptimisticSizeBST",
     "HandshakesBST",
     "StampedLockBST",
+    "BarrierBST",
 ]
 
 def get_datastructure_algs(baselineAlg, algs, include_baseline=False):
