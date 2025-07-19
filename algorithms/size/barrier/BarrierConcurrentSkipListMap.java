@@ -287,7 +287,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     final Comparator<? super K> comparator;
     
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator(this::cleanListOfUpdateInfoFields);
+    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -398,6 +398,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
             Object valOrRemoveInfo = n.valOrRemoveInfo;
             if (valOrRemoveInfo != null) {
                 sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
+                VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
             }
             Node<K, V> f, p;
             for (;;) {
@@ -1262,34 +1263,40 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Only one thread can execute concurrently
     */
     public boolean cleanListOfUpdateInfoFields() {
-        cleanBaseLevel();
-        cleanIndexLevels();
+        //cleanIndexLevels();
+        //cleanBaseLevel();
+        if (!ensureBaseListIsClean()) {
+            System.err.println("Error in base level clean!");
+            System.exit(-1);
+        }
+        if (!ensureIndexListIsClean()) {
+            System.err.println("Error in index levels clean!");
+            System.exit(-1);
+        }
         return true;
     }
 
     private void cleanIndexLevels()
     {
-        Index<K, V> h;
+        Index<K, V> q;
+        Index<K, V> h = head;
         VarHandle.acquireFence();
-        if ((h = head) == null)
-            return;
+        if (h == null) return;
         else {
-            Index<K, V> q = h, r, d;
-            d = q;
-            for (;;) {
+            for (Index<K, V> r, d;;) {
+                q = h;
                 while ((r = q.right) != null) {
                     Node<K, V> p;
-                    Object valOrRemoveInfo;
-                    if ((p = r.node) == null || p.key == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
-                        RIGHT.compareAndSet(q, r, r.right);
-                    else
+                    Object valOrRemoveInfo = null;
+                    if ((p = r.node) == null)
+                        q = r; 
+                    else if ((valOrRemoveInfo = p.valOrRemoveInfo) instanceof UpdateInfo) {
+                        VAL_OR_REMOVE_INFO.compareAndSet(p, valOrRemoveInfo, null);
+                    } else
                         q = r;
                 }
-                q = d.down;
-                if (q == null)
-                    break;
-                else
-                    d = q;
+                if ((d = h.down) != null) h = d;
+                else break;
             }
         }
     }
@@ -1302,16 +1309,15 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
             Node<K,V> n; Object valOrRemoveInfo;
             if ((n = b.next) == null)
                 break;
-            else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || valOrRemoveInfo instanceof UpdateInfo) {
+            else if ((valOrRemoveInfo = n.valOrRemoveInfo) instanceof UpdateInfo) {
                 VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
-                unlinkNode(b, n);
             }
             else
                 b = n;
         }
     }
 
-    private boolean ensureListIsClean() {
+    private boolean ensureBaseListIsClean() {
         Node<K, V> b = baseHead();
         String res = "";
         if (b == null)
@@ -1325,6 +1331,34 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
             else {
                 res += n.valOrRemoveInfo + ", ";
                 b = n;
+            }
+        }
+        return true;
+    }
+
+    private boolean ensureIndexListIsClean() {
+        Index<K, V> q;
+        Index<K, V> h = head;
+        String res = "";
+        VarHandle.acquireFence();
+        if (h == null) return true;
+        else {
+            for (Index<K, V> r, d;;) {
+                q = h;
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    Object valOrRemoveInfo;
+                    if ((p = r.node) == null)
+                        q = r;
+                    else if ((valOrRemoveInfo = p.valOrRemoveInfo) instanceof UpdateInfo)
+                        return false;
+                    else {
+                        res += valOrRemoveInfo;
+                        q = r;
+                    }
+                }
+                if ((d = h.down) != null) h = d;
+                else break;
             }
         }
         return true;

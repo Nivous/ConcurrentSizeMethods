@@ -32,7 +32,6 @@ import measurements.support.Padding;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.function.Supplier;
 
 public class BarrierSizeCalculator<V> {
     // Each long is 8 bytes; PADDING longs provide 8 * PADDING bytes of padding
@@ -44,16 +43,8 @@ public class BarrierSizeCalculator<V> {
     private final long[][] metadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING]; 
     private final long[][] fastMetadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING];
     private volatile CountersSnapshot countersSnapshot = new CountersSnapshot().deactivate();
-    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl4();
+    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
     //private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
-
-    
-    /**
-     * Initializes a new BarrierSizeCalculator with default state and a call back function.
-     */
-    public BarrierSizeCalculator(Supplier<Boolean> cb_func) {
-        barrier.setCBFunc(cb_func);
-    }
 
     /**
      * Initializes a new BarrierSizeCalculator with default state.
@@ -80,7 +71,7 @@ public class BarrierSizeCalculator<V> {
         activeCountersSnapshot.setFastSize(count);
         collect(activeCountersSnapshot);
 
-        invokeNextSizePhase(true); // Trigger next size phase, to reveret threads to fast path
+        invokeNextSizePhase(); // Trigger next size phase, to reveret threads to fast path
         awaitForThreadSynchronization(); // Wait for all threads to reach next size phase
         leaveTheBarrier();
 
@@ -174,8 +165,8 @@ public class BarrierSizeCalculator<V> {
     /**
      * Invoke the next size phase
      */
-    private void invokeNextSizePhase(boolean activate_cb) {
-        barrier.trigger(activate_cb); // Trigger next size phase, to move the threads to slow path
+    private void invokeNextSizePhase() {
+        barrier.trigger(); // Trigger next size phase, to move the threads to slow path
     }
     
     /**
@@ -242,7 +233,7 @@ public class BarrierSizeCalculator<V> {
             if (witnessedCountersSnapshot == currentCountersSnapshot) {
                 // We're in charge of size computation
                 
-                invokeNextSizePhase(false); // Trigger next size phase, to move the threads to slow path
+                invokeNextSizePhase(); // Trigger next size phase, to move the threads to slow path
                 registerToTheBarrier(); // Register to barrier
                 
                 // Compute size and return to idle state

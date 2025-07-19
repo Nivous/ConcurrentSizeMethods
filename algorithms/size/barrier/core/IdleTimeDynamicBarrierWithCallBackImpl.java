@@ -3,7 +3,7 @@ package algorithms.size.barrier.core;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
-public class IdleTimeDynamicBarrierImpl4 implements IdleTimeDynamicBarrier{
+public class IdleTimeDynamicBarrierWithCallBackImpl implements IdleTimeDynamicBarrierWithCallBack{
 
     // Implementation variables
     private AtomicLong sensePhase = new AtomicLong(0);
@@ -24,10 +24,10 @@ public class IdleTimeDynamicBarrierImpl4 implements IdleTimeDynamicBarrier{
     private static final long waitingMask = (1L << sizeShift) - 1;
     private static final long sizeMask = (1L << 62) - 1 - waitingMask;
 
-    public IdleTimeDynamicBarrierImpl4() {
+    public IdleTimeDynamicBarrierWithCallBackImpl() {
     }
 
-    public IdleTimeDynamicBarrierImpl4(Supplier<Boolean> cb_func) {
+    public IdleTimeDynamicBarrierWithCallBackImpl(Supplier<Boolean> cb_func) {
         finalCallBackFunction = cb_func;
     }
 

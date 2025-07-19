@@ -755,6 +755,7 @@ public class Tests {
         System.out.println("Set DEBUG_PRINTS=true for verbose test prints.");
 
         System.out.println("[Running tests with up to " + (NUM_THREADS + 1) + " worker threads.]");
+        System.out.println("[Running tests DEBUG_PRINTS = " + DEBUG_PRINTS + ".]");
         System.out.println();
 
         // Run tests

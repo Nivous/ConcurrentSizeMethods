@@ -53,7 +53,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     private final Node<K, V>[] table;
 
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator(this::cleanListOfUpdateInfoFields);
+    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
 
     /* ------ Taken from https://github.com/openjdk/jdk/blob/dc7d30d08eacbe4d00d16b13e921359d38c77cd8/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java ------ */
 
@@ -447,7 +447,11 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      */
     private void slow_completeRemove(Node<K, V> b, Node<K, V> n) {
         if (b != null && n != null) {
-            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) n.valOrRemoveInfo);
+            Object valOrRemoveInfo = n.valOrRemoveInfo;
+            if (valOrRemoveInfo != null) {
+                sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
+                VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
+            }
 
             Node<K, V> f, p;
             for (;;) {
