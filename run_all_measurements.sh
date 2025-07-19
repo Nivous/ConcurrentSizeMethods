@@ -18,9 +18,9 @@ multicoreServer=T
 JVM_MEM=$([ "$multicoreServer" = "T" ] && echo "31G" || echo "8G")
 
 # Test run parameters
-warmupRepeats=1
-repeats=2
-runtime=1
+warmupRepeats=5
+repeats=10
+runtime=5
 defaultDSSize=1000000
 sizeDelay=700
 
