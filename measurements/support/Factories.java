@@ -25,8 +25,6 @@ public class Factories {
     public static final ArrayList<SetFactory<Integer>> factories = new ArrayList<SetFactory<Integer>>();
 
     static {
-        if (0 == 1) {
-
         factories.add(new ConcurrentSkipListMapFactory<Integer>());
         factories.add(new LockFreeBSTFactory<Integer>());
         factories.add(new HashTableFactory<Integer>());
@@ -46,7 +44,6 @@ public class Factories {
         factories.add(new StampedLockConcurrentSkipListMapFactory<Integer>());
         factories.add(new StampedLockBSTFactory<Integer>());
         factories.add(new StampedLockHashTableFactory<Integer>());
-        }
 
         factories.add(new BarrierConcurrentSkipListMapFactory<Integer>());
         factories.add(new BarrierBSTFactory<Integer>());
