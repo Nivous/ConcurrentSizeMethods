@@ -185,7 +185,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
             } else {
                 if (c == 0) {
                     if (valOrRemoveInfo instanceof UpdateInfo)
-                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) n.valOrRemoveInfo);
+                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
                     else {
                         UpdateInfo insertInfo = n.insertInfo;
                         if (insertInfo != null) {
