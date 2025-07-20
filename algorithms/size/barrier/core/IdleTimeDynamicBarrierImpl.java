@@ -26,7 +26,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
 
     @Override
     public long getPhase() {
-        return extractPhase((long) SENSE_PHASE.getVolatile(this));
+        return extractPhase((long) SENSE_PHASE.getAcquire(this));
     }
 
     @Override
@@ -64,6 +64,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     @Override
     public void trigger() {
         prepareNextPhase();
+        VarHandle.acquireFence();
         incrementBarrierPhase();
         if (noActiveThreads()) {
             deactivateBarrierFromTrigger();
@@ -71,10 +72,10 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private void prepareNextPhase() {
-        long expectedValue = (long) PARITY_SIZE_WAITING.getOpaque(this);
+        long expectedValue = (long) PARITY_SIZE_WAITING.get(this);
         long newValue = ((1L - (extractParity(expectedValue))) << parityShift) + (extractSize(expectedValue) << sizeShift);
         while (!PARITY_SIZE_WAITING.compareAndSet(this, expectedValue, newValue)) {
-            expectedValue = (long) PARITY_SIZE_WAITING.getOpaque(this);
+            expectedValue = (long) PARITY_SIZE_WAITING.get(this);
             newValue = ((1L - (extractParity(expectedValue))) << parityShift) + (extractSize(expectedValue) << sizeShift);
         }
     }
@@ -93,7 +94,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private long getPhaseLSB() {
-        return extractPhase((long) SENSE_PHASE.getVolatile(this)) & 0x1;
+        return extractPhase((long) SENSE_PHASE.get(this)) & 0x1;
     }
 
     private long getThreadPhaseLSB() {
@@ -109,7 +110,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private long numberOfActiveThreads() {
-        return extractSize((long) PARITY_SIZE_WAITING.getOpaque(this));
+        return extractSize((long) PARITY_SIZE_WAITING.get(this));
     }
 
     private void deactivateBarrier() {
@@ -119,7 +120,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private boolean allActiveThreadsBlocked() {
-        long localValue = (long) PARITY_SIZE_WAITING.getOpaque(this);
+        long localValue = (long) PARITY_SIZE_WAITING.get(this);
         return extractSize(localValue) == extractWaiting(localValue);
     }
 
@@ -128,7 +129,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private boolean isBarrierActive() {
-        return extractSense((long) SENSE_PHASE.getVolatile(this)) != getThreadPhaseLSB();
+        return extractSense((long) SENSE_PHASE.get(this)) != getThreadPhaseLSB();
     }
 
     private long extractParity(long field) {
@@ -152,15 +153,15 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private void incrementSize() {
-        PARITY_SIZE_WAITING.getAndAdd(this, sizeIncrementValue);
+        PARITY_SIZE_WAITING.getAndAddRelease(this, sizeIncrementValue);
     }
 
     private long incrementWaiting() {
-        return (long) PARITY_SIZE_WAITING.getAndAdd(this, 1);
+        return (long) PARITY_SIZE_WAITING.getAndAddAcquire(this, 1);
     }
 
     private void decrementSize() {
-        PARITY_SIZE_WAITING.getAndAdd(this, -sizeIncrementValue);
+        PARITY_SIZE_WAITING.getAndAddAcquire(this, -sizeIncrementValue);
     }
 
     private void incrementBarrierPhase() {
@@ -168,8 +169,8 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private void deactivateBarrierFromTrigger() {
-        long newSensePhase = ((getPhaseLSB()) << senseShift) + extractPhase((long) SENSE_PHASE.getOpaque(this));
-        SENSE_PHASE.setOpaque(this, newSensePhase);
+        long newSensePhase = ((getPhaseLSB()) << senseShift) + extractPhase((long) SENSE_PHASE.get(this));
+        SENSE_PHASE.set(this, newSensePhase);
     }
 
     // VarHandle mechanics
