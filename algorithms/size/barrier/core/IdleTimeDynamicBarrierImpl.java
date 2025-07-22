@@ -2,15 +2,20 @@ package algorithms.size.barrier.core;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.concurrent.atomic.AtomicLong;
+
+import measurements.support.ThreadID;
 
 public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
 
     // Implementation variables
     private long sensePhase = 0;
-    private long paritySizeWaiting = 0;
+    private long parityWaiting = 0;
+    private long [] activeThread = new long[activeArraySize];
     private ThreadLocal<Long> threadPhase = new ThreadLocal<Long>();
     
     // Helper fields
+    private static final int activeArraySize = ThreadID.MAX_THREADS;
     private static final int sizeShift = 31;
     private static final int parityShift = 63;
     private static final int senseShift = 63;
@@ -63,8 +68,9 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
 
     @Override
     public void trigger() {
-        prepareNextPhase();
-        VarHandle.acquireFence();
+        setWaitingToZero();
+        // Not needed in intel
+        //VarHandle.acquireFence();
         incrementBarrierPhase();
         if (noActiveThreads()) {
             deactivateBarrierFromTrigger();
@@ -110,7 +116,15 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private long numberOfActiveThreads() {
-        return extractSize((long) PARITY_SIZE_WAITING.get(this));
+        return sumActiveArray();
+        //return extractSize((long) PARITY_SIZE_WAITING.get(this));
+    }
+
+    private long sumActiveArray() {
+        long count = 0;
+        for (int i = 0; i < activeArraySize; i++)
+            count += (long) ACTIVE_THREAD.getAcquire(activeThread, i);
+        return count;
     }
 
     private void deactivateBarrier() {
@@ -120,8 +134,9 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private boolean allActiveThreadsBlocked() {
-        long localValue = (long) PARITY_SIZE_WAITING.get(this);
-        return extractSize(localValue) == extractWaiting(localValue);
+        long localValue = (long) PARITY_SIZE_WAITING.getVolatile(this);
+        return numberOfActiveThreads() == extractWaiting(localValue);
+        //return extractSize(localValue) == extractWaiting(localValue);
     }
 
     private boolean isIncrementForIncorrectPhase(long localParity) {
@@ -153,7 +168,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private void incrementSize() {
-        PARITY_SIZE_WAITING.getAndAddRelease(this, sizeIncrementValue);
+        ACTIVE_THREAD.getAndAddRelease(activeThread, getThreadIndex(), 1);
     }
 
     private long incrementWaiting() {
@@ -161,7 +176,7 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     private void decrementSize() {
-        PARITY_SIZE_WAITING.getAndAddAcquire(this, -sizeIncrementValue);
+        ACTIVE_THREAD.getAndAddAcquire(activeThread, getThreadIndex(), -1);
     }
 
     private void incrementBarrierPhase() {
@@ -173,15 +188,25 @@ public class IdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
         SENSE_PHASE.set(this, newSensePhase);
     }
 
+    private int getThreadIndex() {
+        return (int) (ThreadID.threadID.get() % activeArraySize);
+    }
+
+    private void setWaitingToZero() {
+        long newValue = ((1L - (getPhaseLSB())) << parityShift);
+        PARITY_SIZE_WAITING.set(this, newValue);
+    }
+
     // VarHandle mechanics
     private static final VarHandle SENSE_PHASE;
     private static final VarHandle PARITY_SIZE_WAITING;
+    private static final VarHandle ACTIVE_THREAD = MethodHandles.arrayElementVarHandle(long[].class);;
 
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
             SENSE_PHASE = l.findVarHandle(IdleTimeDynamicBarrierImpl.class, "sensePhase", long.class);
-            PARITY_SIZE_WAITING = l.findVarHandle(IdleTimeDynamicBarrierImpl.class, "paritySizeWaiting", long.class);
+            PARITY_SIZE_WAITING = l.findVarHandle(IdleTimeDynamicBarrierImpl.class, "parityWaiting", long.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }

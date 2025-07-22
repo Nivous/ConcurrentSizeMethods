@@ -407,8 +407,6 @@ public class BarrierSizeCalculator<V> {
     // VarHandles for accessing arrays with volatile semantics
     private static final VarHandle FAST_METADATA_COUNTERS = MethodHandles.arrayElementVarHandle(long[].class);
     private static final VarHandle METADATA_COUNTERS = MethodHandles.arrayElementVarHandle(long[].class);
-    private static final VarHandle OP_PHASE = MethodHandles.arrayElementVarHandle(long[].class);
-    private static final VarHandle SIZE_PHASE = MethodHandles.arrayElementVarHandle(long[].class);
     private static final VarHandle COUNTERS_SNAPSHOT;
 
     static {
