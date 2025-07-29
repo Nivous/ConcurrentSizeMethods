@@ -27,7 +27,8 @@ sizeDelay=700
 
 # Thread and retry configurations based on server type
 if [ "$multicoreServer" = "T" ]; then
-  workloadThreadsListWithoutSizeThread='[1,4,8,16,32,64]'
+  #workloadThreadsListWithoutSizeThread='[1,4,8,16,32,64]'
+  workloadThreadsListWithoutSizeThread='[1,8,64]'
   workloadThreadsListWithOneSizeThread='[1,3,7,15,31,63]'
   sizeThreads='[1,4,8,16,32]'
   workloadThreadsWithVariableSizeThreads=32
@@ -98,19 +99,19 @@ run_java_overhead_experiments() {
   local base="python3 measurements/python_scripts/overhead_runner.py"
   local cmds=(
     "$base --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads \"$workloadThreadsListWithoutSizeThread\" --size-threads 0 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
-    "$base --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+    #"$base --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
     "$base --init-size $defaultDSSize --insert-rate 3  --delete-rate 2  --workload-threads \"$workloadThreadsListWithoutSizeThread\" --size-threads 0 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
-    "$base --init-size $defaultDSSize --insert-rate 3  --delete-rate 2  --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
-    "$base --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay $sizeDelay --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
-    "$base --init-size $defaultDSSize --insert-rate 3  --delete-rate 2  --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay $sizeDelay --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+    #"$base --init-size $defaultDSSize --insert-rate 3  --delete-rate 2  --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+    #"$base --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay $sizeDelay --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+    #"$base --init-size $defaultDSSize --insert-rate 3  --delete-rate 2  --workload-threads \"$workloadThreadsListWithOneSizeThread\" --size-threads 1 --size-delay $sizeDelay --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
   )
 
   for cmd in "${cmds[@]}"; do
     run_cmd "$cmd"
   done
 
-  run_cmd "python3 measurements/python_scripts/scalability_runner.py --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads $workloadThreadsWithVariableSizeThreads --size-threads-list \"$sizeThreads\" --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
-  run_cmd "python3 measurements/python_scripts/scalability_runner.py --init-size $defaultDSSize --insert-rate 3 --delete-rate 2 --workload-threads $workloadThreadsWithVariableSizeThreads --size-threads-list \"$sizeThreads\" --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+  #run_cmd "python3 measurements/python_scripts/scalability_runner.py --init-size $defaultDSSize --insert-rate 30 --delete-rate 20 --workload-threads $workloadThreadsWithVariableSizeThreads --size-threads-list \"$sizeThreads\" --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
+  #run_cmd "python3 measurements/python_scripts/scalability_runner.py --init-size $defaultDSSize --insert-rate 3 --delete-rate 2 --workload-threads $workloadThreadsWithVariableSizeThreads --size-threads-list \"$sizeThreads\" --size-delay 0 --warmup-runs $warmupRepeats --repeats $repeats --runtime $runtime --jvm-mem $JVM_MEM"
 }
 
 # Run overhead experiments with Zipfian distribution
