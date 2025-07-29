@@ -33,7 +33,9 @@ import measurements.support.Padding;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
-public class BarrierSizeCalculator<V> {
+import nativeCode.MemBarrier;
+
+public class BarrierSizeCalculator {
     // Each long is 8 bytes; PADDING longs provide 8 * PADDING bytes of padding
     // to prevent false sharing
     private static final int PADDING = Padding.PADDING;
@@ -43,13 +45,19 @@ public class BarrierSizeCalculator<V> {
     private final long[][] metadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING]; 
     private final long[][] fastMetadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING];
     private volatile CountersSnapshot countersSnapshot = new CountersSnapshot().deactivate();
-    private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
+    private final WeakIdleTimeDynamicBarrierImpl weakBarrier = new WeakIdleTimeDynamicBarrierImpl();
+    private final IdleTimeDynamicBarrierImpl strongBarrier = new IdleTimeDynamicBarrierImpl();
+    private volatile IdleTimeDynamicBarrier barrier = weakBarrier;
     //private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
 
     /**
      * Initializes a new BarrierSizeCalculator with default state.
      */
     public BarrierSizeCalculator() {
+    }
+
+    public IdleTimeDynamicBarrier getBarrierUsed() {
+        return barrier;
     }
 
     /**
@@ -71,9 +79,10 @@ public class BarrierSizeCalculator<V> {
         activeCountersSnapshot.setFastSize(count);
         collect(activeCountersSnapshot);
 
-        invokeNextSizePhase(); // Trigger next size phase, to reveret threads to fast path
-        awaitForThreadSynchronization(); // Wait for all threads to reach next size phase
-        leaveTheBarrier();
+        strongBarrier.trigger();
+        strongBarrier.await();
+        strongBarrier.leave();
+        barrier = weakBarrier;
 
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
@@ -233,8 +242,15 @@ public class BarrierSizeCalculator<V> {
             if (witnessedCountersSnapshot == currentCountersSnapshot) {
                 // We're in charge of size computation
                 
-                invokeNextSizePhase(); // Trigger next size phase, to move the threads to slow path
-                registerToTheBarrier(); // Register to barrier
+                strongBarrier.register();
+                strongBarrier.trigger();
+                barrier = strongBarrier;
+
+                VarHandle.acquireFence();
+                MemBarrier.flushAllThreads();
+                
+                weakBarrier.blockUntilAllInactive();
+                strongBarrier.await();
                 
                 // Compute size and return to idle state
                 int sz = (int) tryCompute();

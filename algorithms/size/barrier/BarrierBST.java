@@ -35,6 +35,7 @@ import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
+import algorithms.size.barrier.core.OperationSelector;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
 
@@ -163,6 +164,8 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     @Contended
     private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
 
+    private final OperationSelector<K, V> selector = new OperationSelector<K, V>(sizeCalculator);
+
     public BarrierBST() {
         // to avoid handling special case when <= 2 nodes,
         // create 2 dummy nodes, both contain key null
@@ -176,78 +179,34 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
 
     /** PRECONDITION: key CANNOT BE NULL **/
     public final boolean containsKey(final K key) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
-            ret = fast_get(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_get(key);
-        }
-        sizeCalculator.leaveTheBarrier();
+        V ret = selector.selectRemoveGet(this::fast_get, this::slow_get, key);
         return ret != null;
     }
 
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V get(final K key) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
-            ret = fast_get(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_get(key);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectRemoveGet(this::fast_get, this::slow_get, key);
     }
 
     // Insert key to dictionary, returns the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V putIfAbsent(final K key, final V value) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path in even phases
-            ret = fast_putIfAbsent(key, value);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_putIfAbsent(key, value);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectPut(this::fast_putIfAbsent, this::slow_putIfAbsent, key, value);
     }
 
     // Insert key to dictionary, return the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V put(final K key, final V value) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_put(key, value);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_put(key, value);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectPut(this::fast_put, this::slow_put, key, value);
     }
 
     // Delete key from dictionary, return the associated value when successful, null otherwise
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V remove(final K key) {
         if (key == null) throw new NullPointerException();
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_remove(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_remove(key);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectRemoveGet(this::fast_remove, this::slow_remove, key);
     }
 
     public int size() {
@@ -767,13 +726,6 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         final Node<K, V> other = (info.p.right == info.l) ? info.p.left : info.p.right;
         (info.gp.left == info.p ? leftUpdater : rightUpdater).compareAndSet(info.gp, info.p, other);
         infoUpdater.compareAndSet(info.gp, info, new Clean());
-    }
-
-    /**
-     * Checks If a thread should operate in the slow path or fast path by parity of the size phase.
-     */
-    private boolean useFastPath(long sizePhase) {
-        return (sizePhase & 0x1) == 0;
     }
 
     /**
