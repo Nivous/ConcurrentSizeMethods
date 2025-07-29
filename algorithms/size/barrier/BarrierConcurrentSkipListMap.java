@@ -34,6 +34,7 @@ import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
+import algorithms.size.barrier.core.OperationSelector;
 import measurements.support.ThreadID;
 import jdk.internal.vm.annotation.Contended;
 
@@ -288,6 +289,8 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     
     @Contended
     private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+
+    private final OperationSelector<K, V> selector = new OperationSelector<K, V>(sizeCalculator);
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -334,14 +337,6 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     }
 
     /* ----------------  Utilities -------------- */
-
-    /**
-     * Checks If a thread should operate in the slow path or fast path by parity of the size phase.
-     */
-    private boolean useFastPath(long sizePhase) {
-        return (sizePhase & 1) == 0;
-    }
-
     /**
      * Compares using comparator or natural ordering if null.
      * Called only by methods that have performed required type checks.
@@ -710,16 +705,26 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @return the old value, or null if newly inserted
      */
     private V doPut(K key, V value, boolean onlyIfAbsent) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_doPut(key, value, onlyIfAbsent);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_doPut(key, value, onlyIfAbsent);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        if (onlyIfAbsent)
+            return selector.selectPut(this::fast_doPutIfAbsentTrue, this::slow_doPutIfAbsentTrue, key, value);
+        else
+            return selector.selectPut(this::fast_doPutIfAbsentFalse, this::slow_doPutIfAbsentFalse, key, value);
+    }
+
+    private V fast_doPutIfAbsentTrue(K key, V value) {
+        return fast_doPut(key, value, true);
+    }
+
+    private V fast_doPutIfAbsentFalse(K key, V value) {
+        return fast_doPut(key, value, false);
+    }
+
+    private V slow_doPutIfAbsentTrue(K key, V value) {
+        return slow_doPut(key, value, true);
+    }
+
+    private V slow_doPutIfAbsentFalse(K key, V value) {
+        return slow_doPut(key, value, false);
     }
     
     /**
@@ -926,16 +931,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @return the node, or null if not found
      */
     final V doRemove(Object key, Object value) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_doRemove(key, value);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_doRemove(key, value);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectObjectRemove(this::fast_doRemove, this::slow_doRemove, key, value);
     }
     
     /**
@@ -1092,15 +1088,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public boolean containsKey(Object key) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_doGet(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_doGet(key);
-        }
-        sizeCalculator.leaveTheBarrier();
+        V ret = selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);
         return ret != null;
     }
 
@@ -1119,16 +1107,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public V get(Object key) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_doGet(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_doGet(key);
-        }
-        sizeCalculator.leaveTheBarrier();
-        return ret;
+        return selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);
     }
 
     /**
@@ -1143,15 +1122,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @since 1.8
      */
     public V getOrDefault(Object key, V defaultValue) {
-        V ret;
-        sizeCalculator.registerToTheBarrier();
-        long currentSizePhase = sizeCalculator.getSizePhase();
-        if (useFastPath(currentSizePhase)) { // Enter the fast path
-            ret = fast_doGet(key);
-        } else { // A size operation is currently in progress. Switch to the slow path.
-            ret = slow_doGet(key);
-        }
-        sizeCalculator.leaveTheBarrier();
+        V ret = selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);;
         return ret == null ? defaultValue : ret;
     }
 
