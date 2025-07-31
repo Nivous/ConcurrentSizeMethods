@@ -4,7 +4,7 @@ set -e
 
 JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
 BUILD_DIR=build
-NATIVE_DIR=./nativeCode
+NATIVE_DIR=./nativecode
 LIB_NAME=libmembarrier.so
 PACKAGE_MAIN=measurements.Main  # your main class
 JAR_NAME=experiments_instr.jar

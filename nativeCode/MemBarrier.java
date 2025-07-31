@@ -1,4 +1,4 @@
-package nativeCode;
+package nativecode;
 
 public class MemBarrier {
     static {
