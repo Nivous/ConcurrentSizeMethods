@@ -33,7 +33,7 @@ import measurements.support.Padding;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 
-import nativeCode.MemBarrier;
+import nativecode.MemBarrier;
 
 public class BarrierSizeCalculator {
     // Each long is 8 bytes; PADDING longs provide 8 * PADDING bytes of padding
