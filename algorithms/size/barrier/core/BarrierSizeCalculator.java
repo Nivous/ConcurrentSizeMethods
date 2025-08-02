@@ -245,8 +245,7 @@ public class BarrierSizeCalculator {
                 strongBarrier.register();
                 strongBarrier.trigger();
                 barrier = strongBarrier;
-
-                VarHandle.acquireFence();
+                
                 MemBarrier.flushAllThreads();
                 
                 weakBarrier.blockUntilAllInactive();

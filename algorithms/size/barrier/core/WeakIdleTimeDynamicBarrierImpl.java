@@ -38,6 +38,16 @@ public class WeakIdleTimeDynamicBarrierImpl implements IdleTimeDynamicBarrier{
     }
 
     @Override
+    public void register(int tid) {
+        activeArray[tid][0] = 1;
+    }
+
+    @Override
+    public void leave(int tid) {
+        activeArray[tid][0] = 0;
+    }
+
+    @Override
     public void trigger() {
     }
 

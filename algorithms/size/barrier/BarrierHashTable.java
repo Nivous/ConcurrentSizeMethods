@@ -35,6 +35,8 @@ import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateOperations;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
 import algorithms.size.barrier.core.OperationSelector;
+import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
+import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
 
@@ -493,7 +495,30 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public boolean containsKey(Object key) {
-        V ret = selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doGet(key);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doGet(key);
+        } else {
+            ret = slow_doGet(key);
+        }
+
+        secondBarrier.leave(tid);
         return ret != null;
     }
 
@@ -512,7 +537,31 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public V get(Object key) {
-        return selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doGet(key);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doGet(key);
+        } else {
+            ret = slow_doGet(key);
+        }
+
+        secondBarrier.leave(tid);
+        return ret;
     }
     
     private V slow_doGet(Object key) {
@@ -535,7 +584,30 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @since 1.8
      */
     public V getOrDefault(Object key, V defaultValue) {
-        V ret = selector.selectObjectRemoveGet(this::fast_doGet, this::slow_doGet, key);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doGet(key);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doGet(key);
+        } else {
+            ret = slow_doGet(key);
+        }
+
+        secondBarrier.leave(tid);
         return ret == null ? defaultValue : ret;
     }
 
@@ -555,7 +627,31 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public V put(K key, V value) {
         if (value == null)
             throw new NullPointerException();
-        return selector.selectPut(this::fast_doPutIfAbsentFalse, this::slow_doPutIfAbsentFalse, key, value);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doPut(key, value, false);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doPut(key, value, false);
+        } else {
+            ret = slow_doPut(key, value, false);
+        }
+
+        secondBarrier.leave(tid);
+        return ret;
     }
     
     private V slow_doPut(K key, V value, boolean onlyIfAbsent) {
@@ -593,7 +689,31 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      */
     public V remove(Object key) {
-        return selector.selectObjectRemove(this::fast_doRemove, this::slow_doRemove, key, null);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doRemove(key, null);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doRemove(key, null);
+        } else {
+            ret = slow_doRemove(key, null);
+        }
+
+        secondBarrier.leave(tid);
+        return ret;
     }
     
     private V slow_doRemove(Object key, Object value) {
@@ -618,7 +738,31 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public V putIfAbsent(K key, V value) {
         if (value == null)
             throw new NullPointerException();
-            return selector.selectPut(this::fast_doPutIfAbsentTrue, this::slow_doPutIfAbsentTrue, key, value);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doPut(key, value, true);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doPut(key, value, true);
+        } else {
+            ret = slow_doPut(key, value, true);
+        }
+
+        secondBarrier.leave(tid);
+        return ret;
     }
 
     /**
@@ -631,7 +775,30 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public boolean remove(Object key, Object value) {
         if (key == null)
             throw new NullPointerException();
-        V ret = selector.selectObjectRemove(this::fast_doRemove, this::slow_doRemove, key, value);
+        V ret;
+        int tid = ThreadID.threadID.get();
+        IdleTimeDynamicBarrier secondBarrier = null;
+        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
+        firstBarrier.register(tid);
+        secondBarrier = firstBarrier;
+
+        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
+            secondBarrier = sizeCalculator.getBarrierUsed();
+
+        if (secondBarrier != firstBarrier) {
+            firstBarrier.leave(tid);
+            secondBarrier.register(tid);
+        }
+
+        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+            ret = fast_doRemove(key, value);
+        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
+            ret = fast_doRemove(key, value);
+        } else {
+            ret = slow_doRemove(key, value);
+        }
+
+        secondBarrier.leave(tid);
         return value != null && ret != null;
     }
 

@@ -1,6 +1,6 @@
 """Common helper functions for measurement scripts."""
 
-M_BARRIER_LIB_PATH="build/libmembarrier.so"
+M_BARRIER_LIB_PATH="build"
 
 from pathlib import Path
 import os
@@ -22,7 +22,7 @@ def java_cmd(memory_size: str):
     """Return the Java command prefix with the requested memory size."""
     base = (
         "java -server -XX:-RestrictContended -XX:ContendedPaddingWidth=64 "
-        f"-Xms{memory_size} -Xmx{memory_size} -jar build/experiments_instr.jar -Djava.library.path={M_BARRIER_LIB_PATH}"
+        f"-Xms{memory_size} -Xmx{memory_size} -Djava.library.path={M_BARRIER_LIB_PATH} -jar build/experiments_instr.jar "
     )
     return base
 

@@ -47,6 +47,16 @@ public class IdleTimeDynamicBarrierAltImpl implements IdleTimeDynamicBarrier{
     }
 
     @Override
+    public void register(int tid) {
+        register();
+    }
+
+    @Override
+    public void leave(int tid) {
+        leave();
+    }
+
+    @Override
     public void await() {
         if (!isBarrierActive()) {
             return;
