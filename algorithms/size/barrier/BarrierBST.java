@@ -37,6 +37,7 @@ import algorithms.size.core.UpdateOperations;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
 import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
+import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
 import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
@@ -183,28 +184,20 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final boolean containsKey(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        IdleTimeDynamicBarrier secondBarrier = null;
-        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
-        firstBarrier.register(tid);
-        secondBarrier = firstBarrier;
-
-        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
-            secondBarrier = sizeCalculator.getBarrierUsed();
-
-        if (secondBarrier != firstBarrier) {
-            firstBarrier.leave(tid);
-            secondBarrier.register(tid);
-        }
-
-        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+        ThreadID.activeArray[tid][0] = 1;
+        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+        if (barrier.isTriggerOn == 0)
             ret = fast_get(key);
-        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
-            ret = fast_get(key);
-        } else {
-            ret = slow_get(key);
+        else {
+            ThreadID.activeArray[tid][0] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_get(key);
+            else
+                ret = slow_get(key);
+            barrier.leave();
         }
-
-        secondBarrier.leave(tid);
+        ThreadID.activeArray[tid][0] = 0;
         return ret != null;
     }
 
@@ -212,28 +205,20 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V get(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        IdleTimeDynamicBarrier secondBarrier = null;
-        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
-        firstBarrier.register(tid);
-        secondBarrier = firstBarrier;
-
-        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
-            secondBarrier = sizeCalculator.getBarrierUsed();
-
-        if (secondBarrier != firstBarrier) {
-            firstBarrier.leave(tid);
-            secondBarrier.register(tid);
-        }
-
-        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+        ThreadID.activeArray[tid][0] = 1;
+        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+        if (barrier.isTriggerOn == 0)
             ret = fast_get(key);
-        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
-            ret = fast_get(key);
-        } else {
-            ret = slow_get(key);
+        else {
+            ThreadID.activeArray[tid][0] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_get(key);
+            else
+                ret = slow_get(key);
+            barrier.leave();
         }
-
-        secondBarrier.leave(tid);
+        ThreadID.activeArray[tid][0] = 0;
         return ret;
     }
 
@@ -243,28 +228,20 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V putIfAbsent(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
-        IdleTimeDynamicBarrier secondBarrier = null;
-        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
-        firstBarrier.register(tid);
-        secondBarrier = firstBarrier;
-
-        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
-            secondBarrier = sizeCalculator.getBarrierUsed();
-
-        if (secondBarrier != firstBarrier) {
-            firstBarrier.leave(tid);
-            secondBarrier.register(tid);
-        }
-
-        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+        ThreadID.activeArray[tid][0] = 1;
+        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+        if (barrier.isTriggerOn == 0)
             ret = fast_putIfAbsent(key, value);
-        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
-            ret = fast_putIfAbsent(key, value);
-        } else {
-            ret = slow_putIfAbsent(key, value);
+        else {
+            ThreadID.activeArray[tid][0] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_putIfAbsent(key, value);
+            else
+                ret = slow_putIfAbsent(key, value);
+            barrier.leave();
         }
-
-        secondBarrier.leave(tid);
+        ThreadID.activeArray[tid][0] = 0;
         return ret;
     }
 
@@ -274,28 +251,20 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V put(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
-        IdleTimeDynamicBarrier secondBarrier = null;
-        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
-        firstBarrier.register(tid);
-        secondBarrier = firstBarrier;
-
-        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
-            secondBarrier = sizeCalculator.getBarrierUsed();
-
-        if (secondBarrier != firstBarrier) {
-            firstBarrier.leave(tid);
-            secondBarrier.register(tid);
-        }
-
-        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+        ThreadID.activeArray[tid][0] = 1;
+        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+        if (barrier.isTriggerOn == 0)
             ret = fast_put(key, value);
-        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
-            ret = fast_put(key, value);
-        } else {
-            ret = slow_put(key, value);
+        else {
+            ThreadID.activeArray[tid][0] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_put(key, value);
+            else
+                ret = slow_put(key, value);
+            barrier.leave();
         }
-
-        secondBarrier.leave(tid);
+        ThreadID.activeArray[tid][0] = 0;
         return ret;
     }
 
@@ -305,28 +274,20 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         if (key == null) throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
-        IdleTimeDynamicBarrier secondBarrier = null;
-        IdleTimeDynamicBarrier firstBarrier = sizeCalculator.getBarrierUsed();
-        firstBarrier.register(tid);
-        secondBarrier = firstBarrier;
-
-        if (firstBarrier instanceof WeakIdleTimeDynamicBarrierImpl)
-            secondBarrier = sizeCalculator.getBarrierUsed();
-
-        if (secondBarrier != firstBarrier) {
-            firstBarrier.leave(tid);
-            secondBarrier.register(tid);
-        }
-
-        if (secondBarrier instanceof WeakIdleTimeDynamicBarrierImpl) {
+        ThreadID.activeArray[tid][0] = 1;
+        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+        if (barrier.isTriggerOn == 0)
             ret = fast_remove(key);
-        } else if ((secondBarrier.getThreadPhase() & 0x1) == 0) {
-            ret = fast_remove(key);
-        } else {
-            ret = slow_remove(key);
+        else {
+            ThreadID.activeArray[tid][0] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_remove(key);
+            else
+                ret = slow_remove(key);
+            barrier.leave();
         }
-
-        secondBarrier.leave(tid);
+        ThreadID.activeArray[tid][0] = 0;
         return ret;
     }
 

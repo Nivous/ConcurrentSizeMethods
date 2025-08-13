@@ -20,6 +20,8 @@ public class IdleTimeDynamicBarrierAltImpl implements IdleTimeDynamicBarrier{
     private static final long phaseMask = senseMask - 1;
     private static final long sizeMask = (1L << phMod4Shift) - 1;
 
+    public volatile int isTriggerOn = 0;
+
     public IdleTimeDynamicBarrierAltImpl() {
     }
 

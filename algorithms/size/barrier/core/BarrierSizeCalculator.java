@@ -46,18 +46,25 @@ public class BarrierSizeCalculator {
     private final long[][] fastMetadataCounters = new long[ThreadID.MAX_THREADS + 1][PADDING];
     private volatile CountersSnapshot countersSnapshot = new CountersSnapshot().deactivate();
     private final WeakIdleTimeDynamicBarrierImpl weakBarrier = new WeakIdleTimeDynamicBarrierImpl();
-    private final IdleTimeDynamicBarrierImpl strongBarrier = new IdleTimeDynamicBarrierImpl();
-    private volatile IdleTimeDynamicBarrier barrier = weakBarrier;
+    private final IdleTimeDynamicBarrierAltImpl strongBarrier = new IdleTimeDynamicBarrierAltImpl();
+    public IdleTimeDynamicBarrierAltImpl barrier;
     //private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
 
     /**
      * Initializes a new BarrierSizeCalculator with default state.
      */
     public BarrierSizeCalculator() {
+        barrier = strongBarrier;
     }
 
-    public IdleTimeDynamicBarrier getBarrierUsed() {
-        return barrier;
+    public IdleTimeDynamicBarrierAltImpl getBarrierUsed() {
+        return strongBarrier;
+    }
+
+    private void ensureNoThreadIsInActiveArray() {
+        for (int i = 0; i < ThreadID.MAX_THREADS; i++) {
+            while (ThreadID.activeArray[i][0] == 1);
+        }
     }
 
     /**
@@ -82,7 +89,7 @@ public class BarrierSizeCalculator {
         strongBarrier.trigger();
         strongBarrier.await();
         strongBarrier.leave();
-        barrier = weakBarrier;
+        strongBarrier.isTriggerOn = 0;
 
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
@@ -244,11 +251,11 @@ public class BarrierSizeCalculator {
                 
                 strongBarrier.register();
                 strongBarrier.trigger();
-                barrier = strongBarrier;
+                strongBarrier.isTriggerOn = 1;
                 
                 MemBarrier.flushAllThreads();
                 
-                weakBarrier.blockUntilAllInactive();
+                ensureNoThreadIsInActiveArray();
                 strongBarrier.await();
                 
                 // Compute size and return to idle state
