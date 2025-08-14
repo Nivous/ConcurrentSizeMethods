@@ -32,7 +32,7 @@ public class ThreadID {
   public static final int MAX_THREADS = 128;
   static PriorityBlockingQueue<Integer> pQueue = new PriorityBlockingQueue<Integer>(MAX_THREADS);
   public static AtomicInteger nextId = new AtomicInteger(0);
-  public static long [][] activeArray = new long[MAX_THREADS][Padding.PADDING];
+  public static long [] activeArray = new long[MAX_THREADS << 3];
 
   public static void register() {
     if (threadID.get() != null)
@@ -44,10 +44,10 @@ public class ThreadID {
         throw new RuntimeException("Too many threads");
       }
       threadID.set(id);
-      activeArray[id][0] = 0;
+      activeArray[id << 3] = 0;
     } else {
       threadID.set(tid);
-      activeArray[tid][0] = 0;
+      activeArray[tid << 3] = 0;
     }
   }
 

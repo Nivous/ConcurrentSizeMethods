@@ -184,12 +184,12 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final boolean containsKey(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_get(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_get(key);
@@ -197,7 +197,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 ret = slow_get(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret != null;
     }
 
@@ -205,12 +205,12 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V get(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_get(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_get(key);
@@ -218,7 +218,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 ret = slow_get(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -228,12 +228,12 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V putIfAbsent(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_putIfAbsent(key, value);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_putIfAbsent(key, value);
@@ -241,7 +241,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 ret = slow_putIfAbsent(key, value);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -251,12 +251,12 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     public final V put(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_put(key, value);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_put(key, value);
@@ -264,7 +264,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 ret = slow_put(key, value);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -274,12 +274,12 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         if (key == null) throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_remove(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_remove(key);
@@ -287,7 +287,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 ret = slow_remove(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 

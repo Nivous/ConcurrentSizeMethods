@@ -710,12 +710,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     private V doPut(K key, V value, boolean onlyIfAbsent) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doPut(key, value, onlyIfAbsent);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doPut(key, value, onlyIfAbsent);
@@ -723,7 +723,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 ret = slow_doPut(key, value, onlyIfAbsent);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -949,12 +949,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     final V doRemove(Object key, Object value) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doRemove(key, value);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doRemove(key, value);
@@ -962,7 +962,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 ret = slow_doRemove(key, value);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
     
@@ -1122,12 +1122,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     public boolean containsKey(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -1135,7 +1135,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret != null;
     }
 
@@ -1156,12 +1156,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     public V get(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -1169,7 +1169,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -1187,12 +1187,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     public V getOrDefault(Object key, V defaultValue) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -1200,7 +1200,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret == null ? defaultValue : ret;
     }
 

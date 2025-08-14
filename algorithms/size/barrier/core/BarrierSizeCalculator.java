@@ -63,7 +63,7 @@ public class BarrierSizeCalculator {
 
     private void ensureNoThreadIsInActiveArray() {
         for (int i = 0; i < ThreadID.MAX_THREADS; i++) {
-            while (ThreadID.activeArray[i][0] == 1);
+            while (ThreadID.activeArray[i << 3] == 1);
         }
     }
 

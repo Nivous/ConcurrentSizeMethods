@@ -498,12 +498,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public boolean containsKey(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -511,7 +511,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret != null;
     }
 
@@ -532,12 +532,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public V get(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -545,7 +545,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
     
@@ -571,12 +571,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public V getOrDefault(Object key, V defaultValue) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doGet(key);
@@ -584,7 +584,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doGet(key);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret == null ? defaultValue : ret;
     }
 
@@ -606,12 +606,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
             throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doPut(key, value, false);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doPut(key, value, false);
@@ -619,7 +619,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doPut(key, value, false);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
     
@@ -660,12 +660,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     public V remove(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doRemove(key, null);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doRemove(key, null);
@@ -673,7 +673,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doRemove(key, null);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
     
@@ -701,12 +701,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
             throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doPut(key, value, true);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doPut(key, value, true);
@@ -714,7 +714,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doPut(key, value, true);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return ret;
     }
 
@@ -730,12 +730,12 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
             throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid][0] = 1;
+        ThreadID.activeArray[tid << 3] = 1;
         IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
         if (barrier.isTriggerOn == 0)
             ret = fast_doRemove(key, value);
         else {
-            ThreadID.activeArray[tid][0] = 0;
+            ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
                 ret = fast_doRemove(key, value);
@@ -743,7 +743,7 @@ public class BarrierHashTable<K, V> implements SizeSet<K, V> {
                 ret = slow_doRemove(key, value);
             barrier.leave();
         }
-        ThreadID.activeArray[tid][0] = 0;
+        ThreadID.activeArray[tid << 3] = 0;
         return value != null && ret != null;
     }
 
