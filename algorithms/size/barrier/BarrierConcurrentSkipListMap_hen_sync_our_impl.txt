@@ -1,4 +1,4 @@
-package algorithms.size.handshakes;
+package algorithms.size.barrier;
 
 /**
  * This is an implementation of the paper "A Study of Synchronization Methods for Concurrent Size"
@@ -33,20 +33,21 @@ import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
-import algorithms.size.handshakes.core.HandshakeSizeCalculator;
-import algorithms.size.handshakes.core.SizePhases;
-import measurements.support.ThreadID;
-import jdk.internal.vm.annotation.Contended;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
 import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
 import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
+import measurements.support.ThreadID;
+import jdk.internal.vm.annotation.Contended;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Comparator;
 import java.util.concurrent.ThreadLocalRandom;
+
+import algorithms.size.handshakes.core.HandshakeSizeCalculator;
+import algorithms.size.handshakes.core.SizePhases;
 
 /**
  * A scalable concurrent skiplist map implementation.
@@ -71,7 +72,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @param <V> the type of mapped values
  * @since 1.6
  */
-public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
+public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     /*
      * This class implements a tree-like two-dimensionally linked skip
      * list in which the index levels are represented in separate
@@ -294,6 +295,11 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     
     @Contended
     private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+
+    @Contended
+    private final HandshakeSizeCalculator handshakeSizeCalculator = new HandshakeSizeCalculator();
+
+    private final OperationSelector<K, V> selector = new OperationSelector<K, V>(sizeCalculator);
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -340,7 +346,6 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     }
 
     /* ----------------  Utilities -------------- */
-
     /**
      * Compares using comparator or natural ordering if null.
      * Called only by methods that have performed required type checks.
@@ -396,7 +401,9 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         if (b != null && n != null) {
             Object valOrRemoveInfo = n.valOrRemoveInfo;
             if (valOrRemoveInfo != null) {
-                sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
+                //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
+                handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
+                VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
             }
             Node<K, V> f, p;
             for (;;) {
@@ -418,12 +425,12 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Returns an index node with key strictly less than given key.
      * Also unlinks indexes to deleted nodes found along the way.
      * Callers rely on this side-effect of clearing indices to deleted
-     * nodes.
+     * nodes. Used in slow mode.
      *
      * @param key if nonnull the key
      * @return a predecessor node of key, or null if uninitialized or null key
      */
-    private Node<K, V> findPredecessor(Object key, Comparator<? super K> cmp) {
+    private Node<K, V> slow_findPredecessor(Object key, Comparator<? super K> cmp) {
         Index<K, V> q;
         VarHandle.acquireFence();
         if ((q = head) == null || key == null) return null;
@@ -440,6 +447,37 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 }
                 if ((d = q.down) != null) q = d;
                 else return q.node;
+            }
+        }
+    }
+
+    /**
+     * Returns an index node with key strictly less than given key.
+     * Also unlinks indexes to deleted nodes found along the way.
+     * Callers rely on this side-effect of clearing indices to deleted
+     * nodes. Used in fast mode.
+     *
+     * @param key if nonnull the key
+     * @return a predecessor node of key, or null if uninitialized or null key
+     */
+    private Node<K, V> fast_findPredecessor(Object key, Comparator<? super K> cmp) {
+        Node<K,V> res;
+        Index<K, V> q;
+        VarHandle.acquireFence();
+        if ((q = head) == null || key == null) return null;
+        else {
+            for (Index<K, V> r, d; ; ) {
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    K k;    
+                    if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null)
+                        RIGHT.compareAndSet(q, r, r.right);
+                    else if (cpr(cmp, key, k) > 0) q = r;
+                        else break;
+                }
+                if ((d = q.down) != null) q = d;
+                else
+                    return q.node;
             }
         }
     }
@@ -473,7 +511,8 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         result = (V) valOrRemoveInfo;
                         UpdateInfo insertInfo = p.insertInfo;
                         if (insertInfo != null) {
-                            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             p.insertInfo = null;
                         }
                         break outer;
@@ -496,15 +535,72 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                                 if (c == 0) {
                                     Object valOrRemoveInfo = n.valOrRemoveInfo;
                                     if (valOrRemoveInfo instanceof UpdateInfo) {
-                                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfoHolder) valOrRemoveInfo);
+                                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfoHolder) valOrRemoveInfo);
+                                        handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfoHolder) valOrRemoveInfo);
                                     } else {
                                         UpdateInfo insertInfo = n.insertInfo;
                                         if (insertInfo != null) {
-                                            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                                            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                                             n.insertInfo = null;
                                         }
                                         result = (V) valOrRemoveInfo;
                                     }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Gets value for key with slow path. Same idea as findNode, except skips over
+     * deletions and markers, and returns first encountered value to
+     * avoid possibly inconsistent rereads.
+     *
+     * @param key the key
+     * @return the value, or null if absent
+     */
+    private V fast_doGet(Object key) {
+        Index<K, V> q;
+        VarHandle.acquireFence();
+        if (key == null) throw new NullPointerException();
+        Comparator<? super K> cmp = comparator;
+        V result = null;
+        if ((q = head) != null) {
+            outer:
+            for (Index<K, V> r, d; ; ) {
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    K k;
+                    Object valOrRemoveInfo;
+                    int c;
+                    if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null)
+                        RIGHT.compareAndSet(q, r, r.right);
+                    else if ((c = cpr(cmp, key, k)) > 0) q = r;
+                    else if (c == 0) {
+                        result = (V) valOrRemoveInfo;
+                        break outer;
+                    } else break;
+                }
+                if ((d = q.down) != null) q = d;
+                else {
+                    Node<K, V> b, n;
+                    if ((b = q.node) != null) {
+                        while ((n = b.next) != null) {
+                            Object valOrRemoveInfo;
+                            int c;
+                            K k = n.key;
+                            if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || k == null || (c = cpr(cmp, key, k)) > 0)
+                                b = n;
+                            else {
+                                if (c == 0) {
+                                    result = (V) valOrRemoveInfo;
                                 }
                                 break;
                             }
@@ -524,7 +620,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * highest level of insertion, then recursively, to chain index
      * nodes to lower ones. Returns null on (staleness) failure,
      * disabling higher-level insertions. Recursion depths are
-     * exponentially less probable.
+     * exponentially less probable. Used in slow mode.
      *
      * @param q starting index for current level
      * @param skips levels to skip before inserting
@@ -571,14 +667,14 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * highest level of insertion, then recursively, to chain index
      * nodes to lower ones. Returns null on (staleness) failure,
      * disabling higher-level insertions. Recursion depths are
-     * exponentially less probable.
+     * exponentially less probable. Used in fast mode.
      *
      * @param q starting index for current level
      * @param skips levels to skip before inserting
      * @param x index for this insertion
      * @param cmp comparator
      */
-    static <K, V> boolean addIndices(Index<K, V> q, int skips, Index<K, V> x, Comparator<? super K> cmp) {
+    static <K, V> boolean fast_addIndices(Index<K, V> q, int skips, Index<K, V> x, Comparator<? super K> cmp) {
         Node<K, V> z;
         K key;
         if (x != null && (z = x.node) != null && (key = z.key) != null && q != null) { // hoist checks
@@ -589,8 +685,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 if ((r = q.right) != null) {
                     Node<K, V> p;
                     K k;
-                    Object valOrRemoveInfo;
-                    if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                    if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null) {
                         RIGHT.compareAndSet(q, r, r.right);
                         c = 0;
                     } else if ((c = cpr(cmp, key, k)) > 0) q = r;
@@ -601,7 +696,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     if ((d = q.down) != null && skips > 0) {
                         --skips;
                         q = d;
-                    } else if (d != null && !retrying && !addIndices(d, 0, x.down, cmp)) break;
+                    } else if (d != null && !retrying && !fast_addIndices(d, 0, x.down, cmp)) break;
                     else {
                         x.right = r;
                         if (RIGHT.compareAndSet(q, r, x)) return true;
@@ -622,7 +717,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @param onlyIfAbsent if should not insert if already present
      * @return the old value, or null if newly inserted
      */
-    private V doPut(K key, V value, boolean onlyIfAbsent) {
+    private V BarrierdoPut(K key, V value, boolean onlyIfAbsent) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
@@ -640,6 +735,22 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         }
         ThreadID.activeArray[tid << 3] = 0;
         return ret;
+    }
+
+    private V fast_doPutIfAbsentTrue(K key, V value) {
+        return fast_doPut(key, value, true);
+    }
+
+    private V fast_doPutIfAbsentFalse(K key, V value) {
+        return fast_doPut(key, value, false);
+    }
+
+    private V slow_doPutIfAbsentTrue(K key, V value) {
+        return slow_doPut(key, value, true);
+    }
+
+    private V slow_doPutIfAbsentFalse(K key, V value) {
+        return slow_doPut(key, value, false);
     }
     
     /**
@@ -702,7 +813,8 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         // current insert is linearized right after that insertion
                         UpdateInfo insertInfo = n.insertInfo;
                         if (insertInfo != null) {
-                            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             n.insertInfo = null;
                         }
                         return (V) valOrRemoveInfo;
@@ -710,7 +822,8 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
 
                     UpdateInfo insertInfo;
                     if (c < 0 && NEXT.compareAndSet(b, n, p = new Node<K, V>(key, value, n, insertInfo = sizeCalculator.createUpdateInfo(UpdateOperations.OpKind.Separated.INSERT)))) {
-                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                        handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         p.insertInfo = null;
                         z = p;
                         break;
@@ -736,7 +849,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         }
                         Object valOrRemoveInfo;
                         if ((valOrRemoveInfo = z.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
-                            findPredecessor(key, cmp); // clean
+                            slow_findPredecessor(key, cmp); // clean
                     }
                     return null;
                 }
@@ -765,8 +878,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                     while ((r = q.right) != null) {
                         Node<K, V> p;
                         K k;
-                        Object valOrRemoveInfo;
-                        if ((p = r.node) == null || (k = p.key) == null || (valOrRemoveInfo = p.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo))
+                        if ((p = r.node) == null || (k = p.key) == null || p.valOrRemoveInfo == null)
                             RIGHT.compareAndSet(q, r, r.right);
                         else if (cpr(cmp, key, k) > 0) q = r;
                         else break;
@@ -792,17 +904,19 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                             cpr(cmp, key, key);
                         c = -1;
                     } else if ((k = n.key) == null) break; // can't append; restart
-                    else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                    else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null) {
                         unlinkNode(b, n);
                         c = 1;
-                    } else if ((c = cpr(cmp, key, k)) > 0) b = n;
+                    }
+                    else if ((c = cpr(cmp, key, k)) > 0) b = n;
                     else if (c == 0 && (onlyIfAbsent || VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, value))) {
                         return (V) valOrRemoveInfo;
                     }
 
                     if (c < 0 && NEXT.compareAndSet(b, n, p = new Node<K, V>(key, value, n))) {
                         z = p;
-                        sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                        //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                        handshakeSizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                         break;
                     }
                 }
@@ -819,15 +933,13 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                             if (rnd >= 0L || --skips < 0) break;
                             else rnd <<= 1;
                         }
-                        if (slow_addIndices(h, skips, x, cmp) && skips < 0 && head == h) { // try to add new level
+                        if (fast_addIndices(h, skips, x, cmp) && skips < 0 && head == h) { // try to add new level
                             Index<K, V> hx = new Index<K, V>(z, x, null);
                             Index<K, V> nh = new Index<K, V>(h.node, h, hx);
                             HEAD.compareAndSet(this, h, nh);
                         }
-                        Object valOrRemoveInfo;
-                        if ((valOrRemoveInfo = z.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) // deleted while adding
-                            // indices
-                            findPredecessor(key, cmp); // clean
+                        if (z.valOrRemoveInfo == null) // deleted while adding indices
+                            fast_findPredecessor(key, cmp); // clean
                     }
                     return null;
                 }
@@ -847,7 +959,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * associated with key
      * @return the node, or null if not found
      */
-    final V doRemove(Object key, Object value) {
+    final V BarrierdoRemove(Object key, Object value) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
@@ -878,7 +990,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V result = null;
         Node<K, V> b;
         outer:
-        while ((b = findPredecessor(key, cmp)) != null && result == null) {
+        while ((b = slow_findPredecessor(key, cmp)) != null && result == null) {
             for (;;) {
                 Node<K, V> n;
                 K k;
@@ -902,7 +1014,8 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 else {
                     UpdateInfo insertInfo = n.insertInfo;
                     if (insertInfo != null) {
-                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                        handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         n.insertInfo = null;
                     }
                     if (VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, sizeCalculator.createUpdateInfo(UpdateOperations.OpKind.Separated.REMOVE))) {
@@ -930,7 +1043,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V result = null;
         Node<K, V> b;
         outer:
-        while ((b = findPredecessor(key, cmp)) != null && result == null) {
+        while ((b = fast_findPredecessor(key, cmp)) != null && result == null) {
             for (;;) {
                 Node<K, V> n;
                 K k;
@@ -938,7 +1051,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 int c;
                 if ((n = b.next) == null) break outer;
                 else if ((k = n.key) == null) break;
-                else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null || (valOrRemoveInfo instanceof UpdateInfo)) {
+                else if ((valOrRemoveInfo = n.valOrRemoveInfo) == null) {
                     unlinkNode(b, n);
                 } else if ((c = cpr(cmp, key, k)) > 0) b = n;
                 else if (c < 0) break outer;
@@ -952,7 +1065,8 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         }
         if (result != null) {
             tryReduceLevel();
-            sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
+            //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
+            handshakeSizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
         }
         return result;
     }
@@ -993,7 +1107,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Constructs a new, empty map, sorted according to the
      * {@linkplain Comparable natural ordering} of the keys.
      */
-    public HandshakesConcurrentSkipListMap() {
+    public BarrierConcurrentSkipListMap() {
         this.comparator = null;
     }
 
@@ -1005,7 +1119,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *        If {@code null}, the {@linkplain Comparable natural
      *        ordering} of the keys will be used.
      */
-    public HandshakesConcurrentSkipListMap(Comparator<? super K> comparator) {
+    public BarrierConcurrentSkipListMap(Comparator<? super K> comparator) {
         this.comparator = comparator;
     }
 
@@ -1020,8 +1134,24 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *         with the keys currently in the map
      * @throws NullPointerException if the specified key is null
      */
-    public boolean containsKey(Object key) {
-        return slow_doGet(key) != null;
+    public boolean BarriercontainsKey(Object key) {
+        V ret;
+        int tid = ThreadID.threadID.get();
+        ThreadID.activeArray[tid << 3] = 1;
+        if (sizeCalculator.isTriggerOn == 0)
+            ret = fast_doGet(key);
+        else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+            ThreadID.activeArray[tid << 3] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_doGet(key);
+            else
+                ret = slow_doGet(key);
+            barrier.leave();
+        }
+        ThreadID.activeArray[tid << 3] = 0;
+        return ret != null;
     }
 
     /**
@@ -1038,8 +1168,24 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *         with the keys currently in the map
      * @throws NullPointerException if the specified key is null
      */
-    public V get(Object key) {
-        return slow_doGet(key);
+    public V Barrierget(Object key) {
+        V ret;
+        int tid = ThreadID.threadID.get();
+        ThreadID.activeArray[tid << 3] = 1;
+        if (sizeCalculator.isTriggerOn == 0)
+            ret = fast_doGet(key);
+        else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+            ThreadID.activeArray[tid << 3] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_doGet(key);
+            else
+                ret = slow_doGet(key);
+            barrier.leave();
+        }
+        ThreadID.activeArray[tid << 3] = 0;
+        return ret;
     }
 
     /**
@@ -1053,9 +1199,24 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      * @since 1.8
      */
-    public V getOrDefault(Object key, V defaultValue) {
-        V v;
-        return (v = slow_doGet(key)) == null ? defaultValue : v;
+    public V BarriergetOrDefault(Object key, V defaultValue) {
+        V ret;
+        int tid = ThreadID.threadID.get();
+        ThreadID.activeArray[tid << 3] = 1;
+        if (sizeCalculator.isTriggerOn == 0)
+            ret = fast_doGet(key);
+        else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+            ThreadID.activeArray[tid << 3] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_doGet(key);
+            else
+                ret = slow_doGet(key);
+            barrier.leave();
+        }
+        ThreadID.activeArray[tid << 3] = 0;
+        return ret == null ? defaultValue : ret;
     }
 
     /**
@@ -1094,9 +1255,11 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     /**
      * Returns the current size of the map.
      */
-    public int size() {
+    public int Barriersize() {
         long c;
-        return ((c = sizeCalculator.compute()) >= Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) c;
+        int res = ((c = sizeCalculator.compute()) >= Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) c;
+        return res;
+        
     }
 
     /* ------ ConcurrentMap API methods ------ */
@@ -1151,13 +1314,231 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            HEAD = l.findVarHandle(HandshakesConcurrentSkipListMap.class, "head", Index.class);
+            HEAD = l.findVarHandle(BarrierConcurrentSkipListMap.class, "head", Index.class);
             NEXT = l.findVarHandle(Node.class, "next", Node.class);
             VAL_OR_REMOVE_INFO = l.findVarHandle(Node.class, "valOrRemoveInfo", Object.class);
             RIGHT = l.findVarHandle(Index.class, "right", Index.class);
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+
+     /**
+     * Main insertion method.  Adds element if not present, or
+     * replaces value if present and onlyIfAbsent is false.
+     *
+     * @param key the key
+     * @param value the value that must be associated with key
+     * @param onlyIfAbsent if should not insert if already present
+     * @return the old value, or null if newly inserted
+     */
+    private V doPut(K key, V value, boolean onlyIfAbsent) {
+        V ret;
+        handshakeSizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = handshakeSizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+            ret = fast_doPut(key, value, onlyIfAbsent);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            handshakeSizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doPut(key, value, onlyIfAbsent);
+        }
+        handshakeSizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        return ret;
+    }
+
+
+    /**
+     * Main deletion method. Locates node, nulls value, appends a
+     * deletion marker, unlinks predecessor, removes associated index
+     * nodes, and possibly reduces head index level.
+     *
+     * @param key the key
+     * @param value if non-null, the value that must be
+     * associated with key
+     * @return the node, or null if not found
+     */
+    final V doRemove(Object key, Object value) {
+        V ret;
+        handshakeSizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = handshakeSizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+            ret = fast_doRemove(key, value);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            handshakeSizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doRemove(key, value);
+        }
+        handshakeSizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        return ret;
+    }
+
+    /* ------ Map API methods ------ */
+    /**
+     * Returns {@code true} if this map contains a mapping for the specified
+     * key.
+     *
+     * @param key key whose presence in this map is to be tested
+     * @return {@code true} if this map contains a mapping for the specified key
+     * @throws ClassCastException if the specified key cannot be compared
+     *         with the keys currently in the map
+     * @throws NullPointerException if the specified key is null
+     */
+    public boolean containsKey(Object key) {
+        return slow_doGet(key) != null;
+    }
+
+    /**
+     * Returns the value to which the specified key is mapped,
+     * or {@code null} if this map contains no mapping for the key.
+     *
+     * <p>More formally, if this map contains a mapping from a key
+     * {@code k} to a value {@code v} such that {@code key} compares
+     * equal to {@code k} according to the map's ordering, then this
+     * method returns {@code v}; otherwise it returns {@code null}.
+     * (There can be at most one such mapping.)
+     *
+     * @throws ClassCastException if the specified key cannot be compared
+     *         with the keys currently in the map
+     * @throws NullPointerException if the specified key is null
+     */
+    public V get(Object key) {
+        return slow_doGet(key);
+    }
+
+    /**
+     * Returns the value to which the specified key is mapped,
+     * or the given defaultValue if this map contains no mapping for the key.
+     *
+     * @param key the key
+     * @param defaultValue the value to return if this map contains
+     * no mapping for the given key
+     * @return the mapping for the key, if present; else the defaultValue
+     * @throws NullPointerException if the specified key is null
+     * @since 1.8
+     */
+    public V getOrDefault(Object key, V defaultValue) {
+        V v;
+        return (v = slow_doGet(key)) == null ? defaultValue : v;
+    }
+
+    /**
+     * Returns the current size of the map.
+     */
+    public int size() {
+        long c;
+        return ((c = handshakeSizeCalculator.compute()) >= Integer.MAX_VALUE) ? Integer.MAX_VALUE : (int) c;
+    }
+
+
+
+
+
+
+
+
+    /* For cleaning the skip list of UpdateInfo fields 
+     * Only one thread can execute concurrently
+    */
+    public boolean cleanListOfUpdateInfoFields() {
+        //cleanIndexLevels();
+        //cleanBaseLevel();
+        if (!ensureBaseListIsClean()) {
+            System.err.println("Error in base level clean!");
+            System.exit(-1);
+        }
+        if (!ensureIndexListIsClean()) {
+            System.err.println("Error in index levels clean!");
+            System.exit(-1);
+        }
+        return true;
+    }
+
+    private void cleanIndexLevels()
+    {
+        Index<K, V> q;
+        Index<K, V> h = head;
+        VarHandle.acquireFence();
+        if (h == null) return;
+        else {
+            for (Index<K, V> r, d;;) {
+                q = h;
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    Object valOrRemoveInfo = null;
+                    if ((p = r.node) == null)
+                        q = r; 
+                    else if ((valOrRemoveInfo = p.valOrRemoveInfo) instanceof UpdateInfo) {
+                        VAL_OR_REMOVE_INFO.compareAndSet(p, valOrRemoveInfo, null);
+                    } else
+                        q = r;
+                }
+                if ((d = h.down) != null) h = d;
+                else break;
+            }
+        }
+    }
+
+    private void cleanBaseLevel() {
+        Node<K, V> b = baseHead();
+        if (b == null)
+            return;
+        for (;;) {
+            Node<K,V> n; Object valOrRemoveInfo;
+            if ((n = b.next) == null)
+                break;
+            else if ((valOrRemoveInfo = n.valOrRemoveInfo) instanceof UpdateInfo) {
+                VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
+            }
+            else
+                b = n;
+        }
+    }
+
+    private boolean ensureBaseListIsClean() {
+        Node<K, V> b = baseHead();
+        String res = "";
+        if (b == null)
+            return true;
+        for (;;) {
+            Node<K,V> n;
+            if ((n = b.next) == null)
+                break;
+            else if (n.valOrRemoveInfo instanceof UpdateInfo)
+                return false;
+            else {
+                res += n.valOrRemoveInfo + ", ";
+                b = n;
+            }
+        }
+        return true;
+    }
+
+    private boolean ensureIndexListIsClean() {
+        Index<K, V> q;
+        Index<K, V> h = head;
+        String res = "";
+        VarHandle.acquireFence();
+        if (h == null) return true;
+        else {
+            for (Index<K, V> r, d;;) {
+                q = h;
+                while ((r = q.right) != null) {
+                    Node<K, V> p;
+                    Object valOrRemoveInfo;
+                    if ((p = r.node) == null)
+                        q = r;
+                    else if ((valOrRemoveInfo = p.valOrRemoveInfo) instanceof UpdateInfo)
+                        return false;
+                    else {
+                        res += valOrRemoveInfo;
+                        q = r;
+                    }
+                }
+                if ((d = h.down) != null) h = d;
+                else break;
+            }
+        }
+        return true;
     }
 
     /**

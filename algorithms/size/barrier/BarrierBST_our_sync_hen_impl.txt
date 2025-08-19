@@ -1,4 +1,4 @@
-package algorithms.size.handshakes;
+package algorithms.size.barrier;
 
 /**
  * This is an implementation of the paper "A Study of Synchronization Methods for Concurrent Size"
@@ -34,19 +34,19 @@ import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
-import algorithms.size.handshakes.core.HandshakeSizeCalculator;
-import algorithms.size.handshakes.core.SizePhases;
-import jdk.internal.vm.annotation.Contended;
-import measurements.support.ThreadID;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
 import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
+import jdk.internal.vm.annotation.Contended;
+import measurements.support.ThreadID;
+
+import algorithms.size.handshakes.core.HandshakeSizeCalculator;
+import algorithms.size.barrier.core.BarrierSizeCalculator;
+import algorithms.size.handshakes.core.SizePhases;
 
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSet<K, V> {
+public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K, V> {
     //--------------------------------------------------------------------------------
     // Class: Node, LeafNode, InternalNode
     //--------------------------------------------------------------------------------
@@ -169,7 +169,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     @Contended
     private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
 
-    public HandshakesBST() {
+    public BarrierBST() {
         // to avoid handling special case when <= 2 nodes,
         // create 2 dummy nodes, both contain key null
         // All real keys inside BST are required to be non-null
@@ -190,7 +190,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
         return slow_get(key);
     }
 
-        // Insert key to dictionary, returns the previous value associated with the specified key,
+    // Insert key to dictionary, returns the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V putIfAbsent(final K key, final V value) {
@@ -239,7 +239,6 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     // Delete key from dictionary, return the associated value when successful, null otherwise
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V remove(final K key) {
-        //long t0 = System.nanoTime(); 
         if (key == null) throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();

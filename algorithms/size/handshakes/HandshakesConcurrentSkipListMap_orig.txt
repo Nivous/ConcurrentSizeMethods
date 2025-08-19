@@ -37,11 +37,6 @@ import algorithms.size.handshakes.core.HandshakeSizeCalculator;
 import algorithms.size.handshakes.core.SizePhases;
 import measurements.support.ThreadID;
 import jdk.internal.vm.annotation.Contended;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
-import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -293,7 +288,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     final Comparator<? super K> comparator;
     
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final transient HandshakeSizeCalculator sizeCalculator = new HandshakeSizeCalculator();
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -624,21 +619,15 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      */
     private V doPut(K key, V value, boolean onlyIfAbsent) {
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doPut(key, value, onlyIfAbsent);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doPut(key, value, onlyIfAbsent);
-            else
-                ret = slow_doPut(key, value, onlyIfAbsent);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doPut(key, value, onlyIfAbsent);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
     
@@ -849,21 +838,15 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      */
     final V doRemove(Object key, Object value) {
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doRemove(key, value);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doRemove(key, value);
-            else
-                ret = slow_doRemove(key, value);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doRemove(key, value);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
     

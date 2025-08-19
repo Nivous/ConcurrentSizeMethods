@@ -395,6 +395,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         if (b != null && n != null) {
             Object valOrRemoveInfo = n.valOrRemoveInfo;
             if (valOrRemoveInfo != null) {
+                //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
                 sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfo) valOrRemoveInfo);
                 VAL_OR_REMOVE_INFO.compareAndSet(n, valOrRemoveInfo, null);
             }
@@ -504,6 +505,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         result = (V) valOrRemoveInfo;
                         UpdateInfo insertInfo = p.insertInfo;
                         if (insertInfo != null) {
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             p.insertInfo = null;
                         }
@@ -527,10 +529,12 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                                 if (c == 0) {
                                     Object valOrRemoveInfo = n.valOrRemoveInfo;
                                     if (valOrRemoveInfo instanceof UpdateInfo) {
+                                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfoHolder) valOrRemoveInfo);
                                         sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, (UpdateInfoHolder) valOrRemoveInfo);
                                     } else {
                                         UpdateInfo insertInfo = n.insertInfo;
                                         if (insertInfo != null) {
+                                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                                             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                                             n.insertInfo = null;
                                         }
@@ -711,10 +715,10 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_doPut(key, value, onlyIfAbsent);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -803,6 +807,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                         // current insert is linearized right after that insertion
                         UpdateInfo insertInfo = n.insertInfo;
                         if (insertInfo != null) {
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             n.insertInfo = null;
                         }
@@ -811,6 +816,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
 
                     UpdateInfo insertInfo;
                     if (c < 0 && NEXT.compareAndSet(b, n, p = new Node<K, V>(key, value, n, insertInfo = sizeCalculator.createUpdateInfo(UpdateOperations.OpKind.Separated.INSERT)))) {
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         p.insertInfo = null;
                         z = p;
@@ -903,6 +909,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
 
                     if (c < 0 && NEXT.compareAndSet(b, n, p = new Node<K, V>(key, value, n))) {
                         z = p;
+                        //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                         sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                         break;
                     }
@@ -950,10 +957,10 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_doRemove(key, value);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -1001,6 +1008,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
                 else {
                     UpdateInfo insertInfo = n.insertInfo;
                     if (insertInfo != null) {
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                         n.insertInfo = null;
                     }
@@ -1051,6 +1059,7 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         }
         if (result != null) {
             tryReduceLevel();
+            //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
             sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
         }
         return result;
@@ -1119,14 +1128,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *         with the keys currently in the map
      * @throws NullPointerException if the specified key is null
      */
-    public boolean containsKey(Object key) {
+    public boolean BarriercontainsKey(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -1153,14 +1162,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *         with the keys currently in the map
      * @throws NullPointerException if the specified key is null
      */
-    public V get(Object key) {
+    public V Barrierget(Object key) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -1184,14 +1193,14 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * @throws NullPointerException if the specified key is null
      * @since 1.8
      */
-    public V getOrDefault(Object key, V defaultValue) {
+    public V BarriergetOrDefault(Object key, V defaultValue) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_doGet(key);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -1306,6 +1315,55 @@ public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
         } catch (ReflectiveOperationException e) {
             throw new ExceptionInInitializerError(e);
         }
+    }
+
+    /* ------ Map API methods ------ */
+    /**
+     * Returns {@code true} if this map contains a mapping for the specified
+     * key.
+     *
+     * @param key key whose presence in this map is to be tested
+     * @return {@code true} if this map contains a mapping for the specified key
+     * @throws ClassCastException if the specified key cannot be compared
+     *         with the keys currently in the map
+     * @throws NullPointerException if the specified key is null
+     */
+    public boolean containsKey(Object key) {
+        return slow_doGet(key) != null;
+    }
+
+    /**
+     * Returns the value to which the specified key is mapped,
+     * or {@code null} if this map contains no mapping for the key.
+     *
+     * <p>More formally, if this map contains a mapping from a key
+     * {@code k} to a value {@code v} such that {@code key} compares
+     * equal to {@code k} according to the map's ordering, then this
+     * method returns {@code v}; otherwise it returns {@code null}.
+     * (There can be at most one such mapping.)
+     *
+     * @throws ClassCastException if the specified key cannot be compared
+     *         with the keys currently in the map
+     * @throws NullPointerException if the specified key is null
+     */
+    public V get(Object key) {
+        return slow_doGet(key);
+    }
+
+    /**
+     * Returns the value to which the specified key is mapped,
+     * or the given defaultValue if this map contains no mapping for the key.
+     *
+     * @param key the key
+     * @param defaultValue the value to return if this map contains
+     * no mapping for the given key
+     * @return the mapping for the key, if present; else the defaultValue
+     * @throws NullPointerException if the specified key is null
+     * @since 1.8
+     */
+    public V getOrDefault(Object key, V defaultValue) {
+        V v;
+        return (v = slow_doGet(key)) == null ? defaultValue : v;
     }
 
     /* For cleaning the skip list of UpdateInfo fields 

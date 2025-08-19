@@ -180,15 +180,25 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     // PUBLIC METHODS:
     //--------------------------------------------------------------------------------
 
-    /** PRECONDITION: key CANNOT BE NULL **/
+        /** PRECONDITION: key CANNOT BE NULL **/
     public final boolean containsKey(final K key) {
+        return slow_get(key) != null;
+    }
+
+    /** PRECONDITION: key CANNOT BE NULL **/
+    public final V get(final K key) {
+        return slow_get(key);
+    }
+
+    /** PRECONDITION: key CANNOT BE NULL **/
+    public final boolean BarriercontainsKey(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_get(key);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -202,14 +212,14 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     }
 
     /** PRECONDITION: key CANNOT BE NULL **/
-    public final V get(final K key) {
+    public final V Barrierget(final K key) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_get(key);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -229,10 +239,10 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_putIfAbsent(key, value);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -252,10 +262,10 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0)
             ret = fast_put(key, value);
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -271,14 +281,18 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     // Delete key from dictionary, return the associated value when successful, null otherwise
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V remove(final K key) {
+        //long t0 = System.nanoTime(); 
         if (key == null) throw new NullPointerException();
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
-        IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-        if (barrier.isTriggerOn == 0)
+        if (sizeCalculator.isTriggerOn == 0) {
+            //long tPreEnd = System.nanoTime();
             ret = fast_remove(key);
+            //long tPreEnd2 = System.nanoTime(); 
+        }
         else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
             ThreadID.activeArray[tid << 3] = 0;
             barrier.register();
             if ((barrier.getThreadPhase() & 0x1) == 0)
@@ -288,6 +302,8 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
             barrier.leave();
         }
         ThreadID.activeArray[tid << 3] = 0;
+        //long tEnd = System.nanoTime();
+        //TimingPreOp.addV1(tPreEnd - t0 + tEnd - tPreEnd2, tPreEnd2 - tPreEnd);
         return ret;
     }
 
@@ -335,12 +351,14 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
         // l might have already been removed by now, but only after its parent was changed from p to another node,
         // so l has been in the tree at the moment it was obtained from p's child pointer.
         if (pinfo != null && pinfo.getClass() == Mark.class && ((Mark<K, V>) pinfo).dinfo.l == l) { // l is being removed
+            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, ((Mark<K, V>) pinfo).dinfo);
             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, ((Mark<K, V>) pinfo).dinfo);
             return null;
         }
         // l's insertion might be still ongoing
         UpdateInfo insertInfo = ((LeafNode<K, V>) l).insertInfo;
         if (insertInfo != null) {
+            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
             ((LeafNode<K, V>) l).insertInfo = null;
         }
@@ -403,6 +421,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
             } else if (key.equals(foundLeaf.key)) {
                 UpdateInfo insertInfo = foundLeaf.insertInfo;
                 if (insertInfo != null) {
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     foundLeaf.insertInfo = null;
                 }
@@ -421,6 +440,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                     helpInsert(newPInfo);
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                     sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                     newNode.insertInfo = null;
                     return null;
@@ -481,6 +501,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) {
                     helpInsert(newPInfo);
+                    //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     return null;
                 } else {
@@ -535,6 +556,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                     if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                         helpInsert(newPInfo);
                         if (insertInfo != null) {
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             newNodeReplacingExisting.insertInfo = null;
                         }
@@ -553,6 +575,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                     // try to IFlag parent
                     if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                         helpInsert(newPInfo);
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                         sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                         newNode.insertInfo = null;
                         return null;
@@ -620,6 +643,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) {
                     helpInsert(newPInfo);
+                    //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     return result;
                 } else {
@@ -674,6 +698,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
 
                 UpdateInfo insertInfo = foundLeaf.insertInfo;
                 if (insertInfo != null) {
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     foundLeaf.insertInfo = null;
                 }
@@ -737,6 +762,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
 
                 if (infoUpdater.compareAndSet(gp, gpinfo, newGPInfo)) {
                     if (fast_helpDelete(newGPInfo)) {
+                        //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
                         sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
                         return foundLeaf.value;
                     }
@@ -798,6 +824,7 @@ public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K
     }
 
     private void slow_helpMarked(final DInfo<K, V> info) {
+        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, info);
         sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, info);
         final Node<K, V> other = (info.p.right == info.l) ? info.p.left : info.p.right;
         (info.gp.left == info.p ? leftUpdater : rightUpdater).compareAndSet(info.gp, info.p, other); // dchild step

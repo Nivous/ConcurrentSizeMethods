@@ -1,4 +1,4 @@
-package algorithms.size.handshakes;
+package algorithms.size.barrier;
 
 /**
  * This is an implementation of the paper "A Study of Synchronization Methods for Concurrent Size"
@@ -33,15 +33,15 @@ import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
-import algorithms.size.handshakes.core.HandshakeSizeCalculator;
-import algorithms.size.handshakes.core.SizePhases;
-import measurements.support.ThreadID;
-import jdk.internal.vm.annotation.Contended;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
-import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
+import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
+import jdk.internal.vm.annotation.Contended;
+import measurements.support.ThreadID;
+
+import algorithms.size.handshakes.core.HandshakeSizeCalculator;
+import algorithms.size.barrier.core.BarrierSizeCalculator;
+import algorithms.size.handshakes.core.SizePhases;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -71,7 +71,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @param <V> the type of mapped values
  * @since 1.6
  */
-public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
+public class BarrierConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     /*
      * This class implements a tree-like two-dimensionally linked skip
      * list in which the index levels are represented in separate
@@ -293,7 +293,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     final Comparator<? super K> comparator;
     
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
     
     /** Lazily initialized topmost index of the skiplist. */
     private transient Index<K, V> head;
@@ -993,7 +993,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      * Constructs a new, empty map, sorted according to the
      * {@linkplain Comparable natural ordering} of the keys.
      */
-    public HandshakesConcurrentSkipListMap() {
+    public BarrierConcurrentSkipListMap() {
         this.comparator = null;
     }
 
@@ -1005,7 +1005,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
      *        If {@code null}, the {@linkplain Comparable natural
      *        ordering} of the keys will be used.
      */
-    public HandshakesConcurrentSkipListMap(Comparator<? super K> comparator) {
+    public BarrierConcurrentSkipListMap(Comparator<? super K> comparator) {
         this.comparator = comparator;
     }
 
@@ -1151,7 +1151,7 @@ public class HandshakesConcurrentSkipListMap<K, V> implements SizeSet<K, V> {
     static {
         try {
             MethodHandles.Lookup l = MethodHandles.lookup();
-            HEAD = l.findVarHandle(HandshakesConcurrentSkipListMap.class, "head", Index.class);
+            HEAD = l.findVarHandle(BarrierConcurrentSkipListMap.class, "head", Index.class);
             NEXT = l.findVarHandle(Node.class, "next", Node.class);
             VAL_OR_REMOVE_INFO = l.findVarHandle(Node.class, "valOrRemoveInfo", Object.class);
             RIGHT = l.findVarHandle(Index.class, "right", Index.class);

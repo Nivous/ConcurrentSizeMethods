@@ -25,6 +25,10 @@ public class IdleTimeDynamicBarrierAltImpl implements IdleTimeDynamicBarrier{
     public IdleTimeDynamicBarrierAltImpl() {
     }
 
+    public IdleTimeDynamicBarrierAltImpl(long initialSize) {
+        PHMOD4_SIZE.setVolatile(this, initialSize);
+    }
+
 
     @Override
     public long getPhase() {

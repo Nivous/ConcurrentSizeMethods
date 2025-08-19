@@ -37,11 +37,6 @@ import algorithms.size.handshakes.core.HandshakeSizeCalculator;
 import algorithms.size.handshakes.core.SizePhases;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
-import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -59,7 +54,7 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
     private final Node<K, V>[] table;
 
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final transient HandshakeSizeCalculator sizeCalculator = new HandshakeSizeCalculator();
 
     /* ------ Taken from https://github.com/openjdk/jdk/blob/dc7d30d08eacbe4d00d16b13e921359d38c77cd8/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java ------ */
 
@@ -555,21 +550,15 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
         if (value == null)
             throw new NullPointerException();
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doPut(key, value, false);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doPut(key, value, false);
-            else
-                ret = slow_doPut(key, value, false);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doPut(key, value, false);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
     
@@ -593,21 +582,15 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
      */
     public V remove(Object key) {
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doRemove(key, null);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doRemove(key, null);
-            else
-                ret = slow_doRemove(key, null);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doRemove(key, null);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
     
@@ -634,21 +617,15 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
         if (value == null)
             throw new NullPointerException();
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doPut(key, value, true);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doPut(key, value, true);
-            else
-                ret = slow_doPut(key, value, true);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doPut(key, value, true);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
 
@@ -663,21 +640,15 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
         if (key == null)
             throw new NullPointerException();
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_doRemove(key, value);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_doRemove(key, value);
-            else
-                ret = slow_doRemove(key, value);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_doRemove(key, value);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return value != null && ret != null;
     }
 

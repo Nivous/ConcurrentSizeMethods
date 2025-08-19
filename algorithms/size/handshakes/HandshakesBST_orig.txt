@@ -38,11 +38,6 @@ import algorithms.size.handshakes.core.HandshakeSizeCalculator;
 import algorithms.size.handshakes.core.SizePhases;
 import jdk.internal.vm.annotation.Contended;
 import measurements.support.ThreadID;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
-import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
-import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
 
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
@@ -167,7 +162,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     final InternalNode<K, V> root;
     
     @Contended
-    private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final HandshakeSizeCalculator sizeCalculator = new HandshakeSizeCalculator();
 
     public HandshakesBST() {
         // to avoid handling special case when <= 2 nodes,
@@ -190,26 +185,20 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
         return slow_get(key);
     }
 
-        // Insert key to dictionary, returns the previous value associated with the specified key,
+    // Insert key to dictionary, returns the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V putIfAbsent(final K key, final V value) {
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_putIfAbsent(key, value);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_putIfAbsent(key, value);
-            else
-                ret = slow_putIfAbsent(key, value);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_putIfAbsent(key, value);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
 
@@ -218,50 +207,32 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V put(final K key, final V value) {
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0)
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_put(key, value);
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_put(key, value);
-            else
-                ret = slow_put(key, value);
-            barrier.leave();
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_put(key, value);
         }
-        ThreadID.activeArray[tid << 3] = 0;
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
 
     // Delete key from dictionary, return the associated value when successful, null otherwise
     /** PRECONDITION: key CANNOT BE NULL **/
     public final V remove(final K key) {
-        //long t0 = System.nanoTime(); 
         if (key == null) throw new NullPointerException();
         V ret;
-        int tid = ThreadID.threadID.get();
-        ThreadID.activeArray[tid << 3] = 1;
-        if (sizeCalculator.isTriggerOn == 0) {
-            //long tPreEnd = System.nanoTime();
+        sizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = sizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
             ret = fast_remove(key);
-            //long tPreEnd2 = System.nanoTime(); 
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            sizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_remove(key);
         }
-        else {
-            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
-            ThreadID.activeArray[tid << 3] = 0;
-            barrier.register();
-            if ((barrier.getThreadPhase() & 0x1) == 0)
-                ret = fast_remove(key);
-            else
-                ret = slow_remove(key);
-            barrier.leave();
-        }
-        ThreadID.activeArray[tid << 3] = 0;
-        //long tEnd = System.nanoTime();
-        //TimingPreOp.addV1(tPreEnd - t0 + tEnd - tPreEnd2, tPreEnd2 - tPreEnd);
+        sizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
         return ret;
     }
 

@@ -1,4 +1,4 @@
-package algorithms.size.handshakes;
+package algorithms.size.barrier;
 
 /**
  * This is an implementation of the paper "A Study of Synchronization Methods for Concurrent Size"
@@ -34,19 +34,20 @@ import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateInfoHolder;
 import algorithms.size.core.UpdateOperations;
-import algorithms.size.handshakes.core.HandshakeSizeCalculator;
-import algorithms.size.handshakes.core.SizePhases;
-import jdk.internal.vm.annotation.Contended;
-import measurements.support.ThreadID;
 import algorithms.size.barrier.core.BarrierSizeCalculator;
 import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
 import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
+import jdk.internal.vm.annotation.Contended;
+import measurements.support.ThreadID;
+
+import algorithms.size.handshakes.core.HandshakeSizeCalculator;
+import algorithms.size.handshakes.core.SizePhases;
 
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
-public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSet<K, V> {
+public class BarrierBST<K extends Comparable<? super K>, V> implements SizeSet<K, V> {
     //--------------------------------------------------------------------------------
     // Class: Node, LeafNode, InternalNode
     //--------------------------------------------------------------------------------
@@ -169,7 +170,12 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     @Contended
     private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
 
-    public HandshakesBST() {
+    @Contended
+    private final HandshakeSizeCalculator handshakeSizeCalculator = new HandshakeSizeCalculator();
+
+    private final OperationSelector<K, V> selector = new OperationSelector<K, V>(sizeCalculator);
+
+    public BarrierBST() {
         // to avoid handling special case when <= 2 nodes,
         // create 2 dummy nodes, both contain key null
         // All real keys inside BST are required to be non-null
@@ -180,7 +186,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     // PUBLIC METHODS:
     //--------------------------------------------------------------------------------
 
-    /** PRECONDITION: key CANNOT BE NULL **/
+        /** PRECONDITION: key CANNOT BE NULL **/
     public final boolean containsKey(final K key) {
         return slow_get(key) != null;
     }
@@ -190,10 +196,110 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
         return slow_get(key);
     }
 
-        // Insert key to dictionary, returns the previous value associated with the specified key,
+    // Insert key to dictionary, returns the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
     public final V putIfAbsent(final K key, final V value) {
+        V ret;
+        handshakeSizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = handshakeSizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+            ret = fast_putIfAbsent(key, value);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            handshakeSizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_putIfAbsent(key, value);
+        }
+        handshakeSizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        return ret;
+    }
+
+    // Insert key to dictionary, return the previous value associated with the specified key,
+    // or null if there was no mapping for the key
+    /** PRECONDITION: key, value CANNOT BE NULL **/
+    public final V put(final K key, final V value) {
+        V ret;
+        handshakeSizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = handshakeSizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+            ret = fast_put(key, value);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            handshakeSizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_put(key, value);
+        }
+        handshakeSizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        return ret;
+    }
+
+    // Delete key from dictionary, return the associated value when successful, null otherwise
+    /** PRECONDITION: key CANNOT BE NULL **/
+    public final V remove(final K key) {
+        if (key == null) throw new NullPointerException();
+        V ret;
+        handshakeSizeCalculator.setOpPhaseVolatile(SizePhases.FAST_PHASE);
+        long currentSizePhase = handshakeSizeCalculator.getSizePhase();
+        if ((currentSizePhase & 3) == 0) { // Enter the fast path
+            ret = fast_remove(key);
+        } else { // A size operation is currently in progress. Switch to the slow path.
+            handshakeSizeCalculator.setOpPhase(currentSizePhase);
+            ret = slow_remove(key);
+        }
+        handshakeSizeCalculator.setOpPhase(SizePhases.IDLE_PHASE);
+        return ret;
+    }
+
+    public int size() {
+        long c;
+        return ((c = handshakeSizeCalculator.compute()) >= Integer.MAX_VALUE) ?
+                Integer.MAX_VALUE : (int) c;
+    }
+
+
+    /** PRECONDITION: key CANNOT BE NULL **/
+    public final boolean BarriercontainsKey(final K key) {
+        V ret;
+        int tid = ThreadID.threadID.get();
+        ThreadID.activeArray[tid << 3] = 1;
+        if (sizeCalculator.isTriggerOn == 0)
+            ret = fast_get(key);
+        else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+            ThreadID.activeArray[tid << 3] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_get(key);
+            else
+                ret = slow_get(key);
+            barrier.leave();
+        }
+        ThreadID.activeArray[tid << 3] = 0;
+        return ret != null;
+    }
+
+    /** PRECONDITION: key CANNOT BE NULL **/
+    public final V Barrierget(final K key) {
+        V ret;
+        int tid = ThreadID.threadID.get();
+        ThreadID.activeArray[tid << 3] = 1;
+        if (sizeCalculator.isTriggerOn == 0)
+            ret = fast_get(key);
+        else {
+            IdleTimeDynamicBarrierAltImpl barrier = sizeCalculator.barrier;
+            ThreadID.activeArray[tid << 3] = 0;
+            barrier.register();
+            if ((barrier.getThreadPhase() & 0x1) == 0)
+                ret = fast_get(key);
+            else
+                ret = slow_get(key);
+            barrier.leave();
+        }
+        ThreadID.activeArray[tid << 3] = 0;
+        return ret;
+    }
+
+    // Insert key to dictionary, returns the previous value associated with the specified key,
+    // or null if there was no mapping for the key
+    /** PRECONDITION: key, value CANNOT BE NULL **/
+    public final V BarrierputIfAbsent(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
@@ -216,7 +322,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     // Insert key to dictionary, return the previous value associated with the specified key,
     // or null if there was no mapping for the key
     /** PRECONDITION: key, value CANNOT BE NULL **/
-    public final V put(final K key, final V value) {
+    public final V Barrierput(final K key, final V value) {
         V ret;
         int tid = ThreadID.threadID.get();
         ThreadID.activeArray[tid << 3] = 1;
@@ -238,7 +344,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
 
     // Delete key from dictionary, return the associated value when successful, null otherwise
     /** PRECONDITION: key CANNOT BE NULL **/
-    public final V remove(final K key) {
+    public final V Barrierremove(final K key) {
         //long t0 = System.nanoTime(); 
         if (key == null) throw new NullPointerException();
         V ret;
@@ -265,7 +371,7 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
         return ret;
     }
 
-    public int size() {
+    public int Barriersize() {
         long c;
         return ((c = sizeCalculator.compute()) >= Integer.MAX_VALUE) ?
                 Integer.MAX_VALUE : (int) c;
@@ -309,14 +415,37 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
         // l might have already been removed by now, but only after its parent was changed from p to another node,
         // so l has been in the tree at the moment it was obtained from p's child pointer.
         if (pinfo != null && pinfo.getClass() == Mark.class && ((Mark<K, V>) pinfo).dinfo.l == l) { // l is being removed
-            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, ((Mark<K, V>) pinfo).dinfo);
+            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, ((Mark<K, V>) pinfo).dinfo);
+            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, ((Mark<K, V>) pinfo).dinfo);
             return null;
         }
         // l's insertion might be still ongoing
         UpdateInfo insertInfo = ((LeafNode<K, V>) l).insertInfo;
         if (insertInfo != null) {
-            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
             ((LeafNode<K, V>) l).insertInfo = null;
+        }
+        return ((LeafNode<K, V>) l).value;
+    }
+
+    public final V fast_get(final K key) {
+        if (key == null) throw new NullPointerException();
+        InternalNode<K, V> p = root;
+        Node<K, V> l = p.left;
+        while (l.getClass() == InternalNode.class) {
+            p = (InternalNode<K, V>) l;
+            l = (l.key == null || key.compareTo(l.key) < 0) ? ((InternalNode<K, V>) l).left : ((InternalNode<K, V>) l).right;
+        }
+        if (l.key == null || key.compareTo(l.key) != 0) { // l is a dummy leaf, or l.key != key
+            return null;
+        }
+        Info<K, V> pinfo = p.info;
+        // We might obtain pinfo when p is no longer l's parent. In that case, we return l.value, and that is fine:
+        // l might have already been removed by now, but only after its parent was changed from p to another node,
+        // so l has been in the tree at the moment it was obtained from p's child pointer.
+        if (pinfo != null && pinfo.getClass() == Mark.class && ((Mark<K, V>) pinfo).dinfo.l == l) { // l is considered removed
+            return null;
         }
         return ((LeafNode<K, V>) l).value;
     }
@@ -356,7 +485,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
             } else if (key.equals(foundLeaf.key)) {
                 UpdateInfo insertInfo = foundLeaf.insertInfo;
                 if (insertInfo != null) {
-                    sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                    handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     foundLeaf.insertInfo = null;
                 }
                 return foundLeaf.value; // key already in the tree, no duplicate allowed
@@ -374,7 +504,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                     helpInsert(newPInfo);
-                    sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
+                    handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                     newNode.insertInfo = null;
                     return null;
                 } else {
@@ -434,7 +565,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) {
                     helpInsert(newPInfo);
-                    sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                    //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                    handshakeSizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     return null;
                 } else {
                     // if fails, help the current operation
@@ -488,7 +620,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
                     if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                         helpInsert(newPInfo);
                         if (insertInfo != null) {
-                            sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                            handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                             newNodeReplacingExisting.insertInfo = null;
                         }
                         return foundLeaf.value;
@@ -506,7 +639,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
                     // try to IFlag parent
                     if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) { // iflag step
                         helpInsert(newPInfo);
-                        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
+                        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
+                        handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, newNodeInsertInfo);
                         newNode.insertInfo = null;
                         return null;
                     }
@@ -573,7 +707,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
                 // try to IFlag parent
                 if (infoUpdater.compareAndSet(p, pinfo, newPInfo)) {
                     helpInsert(newPInfo);
-                    sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                    //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
+                    handshakeSizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.INSERT, ThreadID.threadID.get());
                     return result;
                 } else {
                     // if fails, help the current operation
@@ -627,7 +762,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
 
                 UpdateInfo insertInfo = foundLeaf.insertInfo;
                 if (insertInfo != null) {
-                    sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                    //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
+                    handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.INSERT, insertInfo);
                     foundLeaf.insertInfo = null;
                 }
 
@@ -690,7 +826,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
 
                 if (infoUpdater.compareAndSet(gp, gpinfo, newGPInfo)) {
                     if (fast_helpDelete(newGPInfo)) {
-                        sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
+                        //sizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
+                        handshakeSizeCalculator.fast_updateMetadata(UpdateOperations.OpKind.REMOVE, ThreadID.threadID.get());
                         return foundLeaf.value;
                     }
                 } else {
@@ -751,7 +888,8 @@ public class HandshakesBST<K extends Comparable<? super K>, V> implements SizeSe
     }
 
     private void slow_helpMarked(final DInfo<K, V> info) {
-        sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, info);
+        //sizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, info);
+        handshakeSizeCalculator.updateMetadata(UpdateOperations.OpKind.Separated.REMOVE, info);
         final Node<K, V> other = (info.p.right == info.l) ? info.p.left : info.p.right;
         (info.gp.left == info.p ? leftUpdater : rightUpdater).compareAndSet(info.gp, info.p, other); // dchild step
         infoUpdater.compareAndSet(info.gp, info, new Clean()); // dunflag step

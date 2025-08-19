@@ -1,4 +1,4 @@
-package algorithms.size.handshakes;
+package algorithms.size.barrier;
 
 /**
  * Implementation of the paper "A Study of Synchronization Methods for Concurrent Size"
@@ -33,21 +33,21 @@ package algorithms.size.handshakes;
 import algorithms.size.core.SizeSet;
 import algorithms.size.core.UpdateInfo;
 import algorithms.size.core.UpdateOperations;
-import algorithms.size.handshakes.core.HandshakeSizeCalculator;
-import algorithms.size.handshakes.core.SizePhases;
-import jdk.internal.vm.annotation.Contended;
-import measurements.support.ThreadID;
-import algorithms.size.barrier.core.BarrierSizeCalculator;
-import algorithms.size.barrier.core.OperationSelector;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrier;
 import algorithms.size.barrier.core.IdleTimeDynamicBarrierAltImpl;
 import algorithms.size.barrier.core.WeakIdleTimeDynamicBarrierImpl;
+import jdk.internal.vm.annotation.Contended;
+import measurements.support.ThreadID;
+
+import algorithms.size.handshakes.core.HandshakeSizeCalculator;
+import algorithms.size.barrier.core.BarrierSizeCalculator;
+import algorithms.size.handshakes.core.SizePhases;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Comparator;
 
-public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
+public class BarrierHashTable<K, V> implements SizeSet<K, V> {
     /**
      * The comparator used to maintain order in this map, or null if
      * using natural ordering.  (Non-private to simplify access in
@@ -59,7 +59,7 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
     private final Node<K, V>[] table;
 
     @Contended
-    private final transient BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
+    private final BarrierSizeCalculator sizeCalculator = new BarrierSizeCalculator();
 
     /* ------ Taken from https://github.com/openjdk/jdk/blob/dc7d30d08eacbe4d00d16b13e921359d38c77cd8/src/java.base/share/classes/java/util/concurrent/ConcurrentHashMap.java ------ */
 
@@ -129,7 +129,7 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
      * Constructs a new, empty map, sorted according to the
      * {@linkplain Comparable natural ordering} of the keys.
      */
-    public HandshakesHashTable(int requestedTableSize) {
+    public BarrierHashTable(int requestedTableSize) {
         this(requestedTableSize, null);
     }
 
@@ -141,7 +141,7 @@ public class HandshakesHashTable<K, V> implements SizeSet<K, V> {
      *        If {@code null}, the {@linkplain Comparable natural
      *        ordering} of the keys will be used.
      */
-    public HandshakesHashTable(int requestedTableSize, Comparator<? super K> comparator) {
+    public BarrierHashTable(int requestedTableSize, Comparator<? super K> comparator) {
         this.comparator = comparator;
 
         if (requestedTableSize <= 0) throw new NegativeArraySizeException();

@@ -48,6 +48,7 @@ public class BarrierSizeCalculator {
     private final WeakIdleTimeDynamicBarrierImpl weakBarrier = new WeakIdleTimeDynamicBarrierImpl();
     private final IdleTimeDynamicBarrierAltImpl strongBarrier = new IdleTimeDynamicBarrierAltImpl();
     public IdleTimeDynamicBarrierAltImpl barrier;
+    public long isTriggerOn = 0;
     //private final IdleTimeDynamicBarrier barrier = new IdleTimeDynamicBarrierImpl();
 
     /**
@@ -89,7 +90,7 @@ public class BarrierSizeCalculator {
         strongBarrier.trigger();
         strongBarrier.await();
         strongBarrier.leave();
-        strongBarrier.isTriggerOn = 0;
+        isTriggerOn = 0;
 
         // Deactivate snapshot (this is size's linearization point)
         activeCountersSnapshot.deactivate();
@@ -251,7 +252,7 @@ public class BarrierSizeCalculator {
                 
                 strongBarrier.register();
                 strongBarrier.trigger();
-                strongBarrier.isTriggerOn = 1;
+                isTriggerOn = 1;
                 
                 MemBarrier.flushAllThreads();
                 
